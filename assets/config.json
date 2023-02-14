@@ -1,0 +1,16 @@
+{
+    "network": {
+        "websocket_ip": "127.0.0.1",
+        "websocket_port": 4000,
+        "http_ip": "127.0.0.1",
+        "http_port": 4001
+    },
+    "db_path": "./world",
+    "assets_path": "./assets",
+    "tick_time_ms": 100,
+    "gameplay_config": {
+        "starting_system": "C1R1:S1",
+        "starting_station": "Test Station",
+        "starting_money": 500000
+    }
+}

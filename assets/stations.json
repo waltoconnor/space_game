@@ -1,0 +1,10 @@
+{
+    "stations": [
+        {
+            "name": "Test Station",
+            "system": "C1R1:S1",
+            "planet_name": "C1R1:S1-1",
+            "orbit": [1846036.0, 0.0, 0.0, 0.0, 0.0, 1.0]
+        }
+    ]
+}
