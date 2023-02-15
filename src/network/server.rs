@@ -69,16 +69,16 @@ pub fn start_network(addr: String) -> ServerHandle {
     ServerHandle::new(dmap, b)
 }
 
-#[derive(Deserialize)]
-struct IntroMessage {
-    pub name: String,
-    pub access_token: String
-}
+// #[derive(Deserialize)]
+// struct IntroMessage {
+//     pub name: String,
+//     pub access_token: String
+// }
 
-#[derive(Serialize)]
-struct IntroMessageResponse {
-    pub status: String
-}
+// #[derive(Serialize)]
+// struct IntroMessageResponse {
+//     pub status: String
+// }
 
 /// A WebSocket echo server
 fn server_thread(addr: SocketAddrV4, server_receive_pipe: Sender<(String, NetIncomingMessage)>, send_to_player_map: Arc<DashMap<String, Mutex<Sender<NetOutgoingMessage>>>>) {

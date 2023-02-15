@@ -51,6 +51,6 @@ fn main() {
         let exec_time = start.elapsed().as_secs_f32();
         sleepy_thread.join().expect("Could not wait for sleepy thread");
         last_cycle_time = start.elapsed().as_secs_f32();
-        println!("CYCLE: {} (EXEC: {}, OCC: {} %)", last_cycle_time, exec_time, 100.0 * exec_time / last_cycle_time);
+        // println!("CYCLE: {} (EXEC: {}, OCC: {} %)", last_cycle_time, exec_time, 100.0 * exec_time / last_cycle_time);
     }
 }
