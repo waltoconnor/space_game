@@ -5,3 +5,4 @@ pub mod navigation;
 pub mod docking_undocking;
 pub mod jump;
 pub mod sense;
+pub mod network_msg_generator;

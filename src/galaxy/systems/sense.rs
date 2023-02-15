@@ -5,7 +5,12 @@ pub fn sys_get_visible(mut sensors: Query<(Entity, &mut Sensor, &Ship)>, signatu
     sensors.par_for_each_mut(4, |(ent, mut sensor, ship)| {
         let sensor_system = match sys_map.get_system_of_entity(ent){
             Some(ss) => ss,
-            None => { eprintln!("NO system found for sensor (bookeeping is broken or sensor object wasn't cleaned up properly?)"); return; }
+            None => {
+                // This goes off the tick the sensor spawns as it hasn't been reflected in the sys_map table yet
+                //if sys_map.entity_table.is_empty() { return; } 
+                //eprintln!("NO system found for sensor (bookeeping is broken or sensor object wasn't cleaned up properly?)"); 
+                return; 
+            }
         };
         let objects_in_system = match sys_map.get_entities_in_system(sensor_system) {
             Some(ois) => ois,

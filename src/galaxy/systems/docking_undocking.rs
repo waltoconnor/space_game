@@ -1,14 +1,14 @@
 use bevy_ecs::prelude::*;
 
-use crate::{galaxy::{components::*, resources::{network_handler::NetworkHandler, path_to_entity::PathToEntityMap, database_resource::DatabaseResource}, bundles::ships::BPlayerShip}, network::messages::incoming::NetIncomingMessage, shared::ObjPath, db::database::DB};
+use crate::{galaxy::{components::*, resources::{network_handler::NetworkHandler, path_to_entity::PathToEntityMap, database_resource::DatabaseResource}, bundles::ships::BPlayerShip, events::{EEvent, EInfo}}, network::messages::incoming::NetIncomingMessage, shared::ObjPath, db::database::DB};
 
-pub fn sys_process_dock(players: Query<(&PlayerController, &Ship, &Transform)>, hangers: Query<(&Hanger, &Transform)>, mut commands: Commands, n: Res<NetworkHandler>, ptm: Res<PathToEntityMap>, db: Res<DatabaseResource>) {
+pub fn sys_process_dock(players: Query<(&PlayerController, &Ship, &Transform)>, hangers: Query<(&Hanger, &Transform)>, mut commands: Commands, n: Res<NetworkHandler>, ptm: Res<PathToEntityMap>, db: Res<DatabaseResource>, mut eev: EventWriter<EEvent>, mut ein: EventWriter<EInfo>) {
     for player in n.view_incoming() {
         let name = player.key();
         for msg in player.value() {
             match msg {
-                NetIncomingMessage::Dock(ship, station) => handle_dock(&players, &hangers, &mut commands, &ptm, ship, station, &db, name),
-                NetIncomingMessage::Undock(hanger_path) => handle_undock(&hangers, &ptm, hanger_path, &db, name, &mut commands),
+                NetIncomingMessage::Dock(ship, station) => handle_dock(&players, &hangers, &mut commands, &ptm, ship, station, &db, name, &mut eev, &mut ein),
+                NetIncomingMessage::Undock(hanger_path) => handle_undock(&hangers, &ptm, hanger_path, &db, name, &mut commands, &mut eev, &mut ein),
                 _ => ()
             }
         }
@@ -16,7 +16,7 @@ pub fn sys_process_dock(players: Query<(&PlayerController, &Ship, &Transform)>, 
     }
 }
 
-fn handle_dock(players: &Query<(&PlayerController, &Ship, &Transform)>, hangers: &Query<(&Hanger, &Transform)>, commands: &mut Commands, ptm: &Res<PathToEntityMap>, ship: &ObjPath, station: &ObjPath, db: &Res<DatabaseResource>, player_name: &String) {
+fn handle_dock(players: &Query<(&PlayerController, &Ship, &Transform)>, hangers: &Query<(&Hanger, &Transform)>, commands: &mut Commands, ptm: &Res<PathToEntityMap>, ship: &ObjPath, station: &ObjPath, db: &Res<DatabaseResource>, player_name: &String, eev: &mut EventWriter<EEvent>, ein: &mut EventWriter<EInfo>) {
     if ship.sys != station.sys {
         eprintln!("Can't dock to station in other system");
         return;
@@ -29,7 +29,11 @@ fn handle_dock(players: &Query<(&PlayerController, &Ship, &Transform)>, hangers:
 
     let station_ent = match ptm.get(station) {
         Some(s) => s,
-        None => { eprintln!("Hanger entity not found for docking"); return; }
+        None => {
+            ein.send(EInfo::Error(player_name.clone(), "Hanger not found on object".to_string())); 
+            eprintln!("Hanger entity not found for docking"); 
+            return; 
+        }
     };
     
     let (pc, p_ship, p_transform) = match players.get(docking_ent) {
@@ -48,6 +52,7 @@ fn handle_dock(players: &Query<(&PlayerController, &Ship, &Transform)>, hangers:
     let (hanger, h_transform) = match hangers.get(station_ent) {
         Ok(h) => h,
         Err(_) => {
+            ein.send(EInfo::Error(player_name.clone(), "Hanger not found on object".to_string())); 
             eprintln!("Docking to nonexistent hanger");
             return;
         }
@@ -57,17 +62,19 @@ fn handle_dock(players: &Query<(&PlayerController, &Ship, &Transform)>, hangers:
 
     // CHECK IF IN RANGE
     if !(h_transform.pos.metric_distance(&p_transform.pos) < hanger.docking_range_m) {
+        ein.send(EInfo::Error(player_name.clone(), "You are not in range to dock".to_string())); 
         eprintln!("Player out of range to dock");
         return;
     }    
 
     db.db.hanger_dock(player_name, hanger.hanger_uid, p_ship.clone());
     db.db.account_change_location(player_name, station.clone());
+    eev.send(EEvent::Dock(player_name.clone(), station.clone()));
     commands.entity(docking_ent).despawn();
 
 }
 
-fn handle_undock(hangers: &Query<(&Hanger, &Transform)>, ptm: &Res<PathToEntityMap>, hanger_path: &ObjPath, db: &Res<DatabaseResource>, player_name: &String, commands: &mut Commands) {
+fn handle_undock(hangers: &Query<(&Hanger, &Transform)>, ptm: &Res<PathToEntityMap>, hanger_path: &ObjPath, db: &Res<DatabaseResource>, player_name: &String, commands: &mut Commands, eev: &mut EventWriter<EEvent>, ein: &mut EventWriter<EInfo>) {
     let hanger_ent = match ptm.get(hanger_path) {
         Some(h) => h,
         None => {
@@ -89,6 +96,7 @@ fn handle_undock(hangers: &Query<(&Hanger, &Transform)>, ptm: &Res<PathToEntityM
 
     match ship {
         None => {
+            ein.send(EInfo::Error(player_name.clone(), "You do not have an active ship".to_string())); 
             eprintln!("Player has no active ship");
             return;
         },
@@ -98,6 +106,7 @@ fn handle_undock(hangers: &Query<(&Hanger, &Transform)>, ptm: &Res<PathToEntityM
             let ship_name = format!("{}:{}", player_name, s.ship_name);
             let new_ship = BPlayerShip::new(player_name, t, s, &hanger_path.sys, &ship_name);
             db.db.account_change_location(player_name, new_ship.game_obj.path.clone());
+            eev.send(EEvent::Undock(player_name.clone(), new_ship.game_obj.path.clone()));
             commands.spawn(new_ship);
         }
     }

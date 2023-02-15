@@ -1,9 +1,9 @@
 use bevy_ecs::prelude::*;
 use nalgebra::{UnitQuaternion, Vector3};
 use rand::Rng;
-use crate::{galaxy::{components::*, resources::{network_handler::NetworkHandler, path_to_entity::PathToEntityMap, database_resource::DatabaseResource}}, network::messages::incoming::NetIncomingMessage, shared::ObjPath};
+use crate::{galaxy::{components::*, resources::{network_handler::NetworkHandler, path_to_entity::PathToEntityMap, database_resource::DatabaseResource}, events::{EInfo, EEvent}}, network::messages::incoming::NetIncomingMessage, shared::ObjPath};
 
-pub fn sys_process_jump_inputs(mut players: Query<(&PlayerController, &mut Transform, &mut GameObject)>, gates: Query<(&Gate, &Transform, &GameObject), Without<PlayerController>>, ptm: Res<PathToEntityMap>, n: Res<NetworkHandler>, db: Res<DatabaseResource>) {
+pub fn sys_process_jump_inputs(mut players: Query<(&PlayerController, &mut Transform, &mut GameObject)>, gates: Query<(&Gate, &Transform, &GameObject), Without<PlayerController>>, ptm: Res<PathToEntityMap>, n: Res<NetworkHandler>, db: Res<DatabaseResource>, mut eev: EventWriter<EEvent>, mut ein: EventWriter<EInfo>) {
     let mut rng = rand::thread_rng();
     for player in n.view_incoming() {
         let player_name = player.key();
@@ -31,6 +31,7 @@ pub fn sys_process_jump_inputs(mut players: Query<(&PlayerController, &mut Trans
 
                     let gate_ent = match ptm.get(gate_path) {
                         None => {
+                            ein.send(EInfo::Error(player_name.clone(), String::from("Gate not found")));
                             eprintln!("Jumping on nonexistent gate");
                             continue;
                         },
@@ -41,6 +42,7 @@ pub fn sys_process_jump_inputs(mut players: Query<(&PlayerController, &mut Trans
 
                     let dist = pc_transform.pos.metric_distance(&g_transform.pos);
                     if dist >= gate.jump_range {
+                        ein.send(EInfo::Error(player_name.clone(), format!("Too far away to jump, must be within {} meters", gate.jump_range)));
                         eprintln!("Too far away to jump");
                         continue;
                     }
@@ -48,6 +50,7 @@ pub fn sys_process_jump_inputs(mut players: Query<(&PlayerController, &mut Trans
                     let dst_gate_ent = match ptm.get(&gate.dst_gate) {
                         Some(dst) => dst,
                         None => {
+                            ein.send(EInfo::Error(player_name.clone(), format!("Gate destination ({}) not found", gate.dst_gate.name)));
                             eprintln!("Gate is connected to nonexistent dst: {:?} -> {:?}", g_go.path, gate.dst_gate);
                             continue;
                         }
@@ -57,6 +60,7 @@ pub fn sys_process_jump_inputs(mut players: Query<(&PlayerController, &mut Trans
 
                     pc_transform.pos = dst_gate_transform.pos + (Vector3::<f64>::new(rng.gen::<f64>() - 0.5, rng.gen::<f64>() - 0.5, rng.gen::<f64>() - 0.5).normalize() * 1000.0);
                     go.path = ObjPath::new(&dst_go.path.sys, go.path.t.clone(), &go.path.name);
+                    eev.send(EEvent::Jump(player_name.clone(), dst_go.path.sys.clone()));
                     db.db.account_change_location(player_name, go.path.clone());
                 },
                 _ => ()

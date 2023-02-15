@@ -1,17 +1,17 @@
-use std::f64::consts::PI;
+use std::{f64::consts::PI, sync::Mutex};
 
 use bevy_ecs::prelude::*;
 use nalgebra::{Vector3, UnitQuaternion};
 
-use crate::{galaxy::{components::*, resources::{network_handler::NetworkHandler, path_to_entity::PathToEntityMap, delta_time::DeltaTime}}, network::messages::incoming::NetIncomingMessage, shared::ObjPath};
+use crate::{galaxy::{components::*, resources::{network_handler::NetworkHandler, path_to_entity::PathToEntityMap, delta_time::DeltaTime}, events::{EInfo, EEvent}}, network::messages::incoming::NetIncomingMessage, shared::ObjPath};
 
 /// PROCESS NON WARP NAVIGATION MESSAGES
 /// Stage: COMMAND
-pub fn sys_process_navigation_inputs_local(mut players: Query<(&PlayerController, &mut Navigation, &Ship)>, n: Res<NetworkHandler>, ptm: Res<PathToEntityMap>) {
+pub fn sys_process_navigation_inputs_local(mut players: Query<(&PlayerController, &mut Navigation, &Ship)>, n: Res<NetworkHandler>, ptm: Res<PathToEntityMap>, mut ein: EventWriter<EInfo>) {
     for entry in n.view_incoming().iter() {
         for msg in entry.value().iter() {
             match msg {
-                NetIncomingMessage::Approach(ship, dst) => update_navigation_local(&mut players, &ptm, ship, dst, &entry.key(), Action::Approach),
+                NetIncomingMessage::Approach(ship, dst) => update_navigation_local(&mut players, &ptm, ship, dst, &entry.key(), Action::Approach, &mut ein),
                 _ => ()
                 /* DO NOT PROCESS WARPS HERE */
             }
@@ -21,7 +21,7 @@ pub fn sys_process_navigation_inputs_local(mut players: Query<(&PlayerController
 }
 
 //TODO: Add visibility check
-fn update_navigation_local(q: &mut Query<(&PlayerController, &mut Navigation, &Ship)>, ptm: &Res<PathToEntityMap>, ship_path: &ObjPath, dst: &ObjPath, player: &String, op: Action) {
+fn update_navigation_local(q: &mut Query<(&PlayerController, &mut Navigation, &Ship)>, ptm: &Res<PathToEntityMap>, ship_path: &ObjPath, dst: &ObjPath, player: &String, op: Action, ein: &mut EventWriter<EInfo>) {
     // get ship entity
     let ship_ent = match ptm.get(ship_path){
         Some(s) => s,
@@ -38,12 +38,14 @@ fn update_navigation_local(q: &mut Query<(&PlayerController, &mut Navigation, &S
     }
 
     if ship_path.sys != dst.sys {
-        eprintln!("Player trying to warp to object in other system TODO: ALERT THEM");
+        ein.send(EInfo::Error(player.clone(), String::from("Navigation target no longer in system")));
+        //eprintln!("Player trying to warp to object in other system TODO: ALERT THEM");
         return;
     }
 
     if nav.warp_state == WarpState::Warping {
-        eprintln!("TODO: alert player that they can't issue nav commands while warping");
+        ein.send(EInfo::Error(player.clone(), String::from("You cannot issue navigation commands while warping")));
+        //eprintln!("TODO: alert player that they can't issue nav commands while warping");
         return;
     }
 
@@ -55,13 +57,13 @@ fn update_navigation_local(q: &mut Query<(&PlayerController, &mut Navigation, &S
 /// PROCESS WARP NAVIGATION MESSAGES
 /// Stage: COMMAND
 // TODO: CHECK VISIBILITY OF TRANSFORM
-pub fn sys_process_navigation_inputs_warp(mut players: Query<(&PlayerController, &mut Navigation, &Ship)>, warp_targets: Query<&WarpTarget>, transforms: Query<&Transform>, n: ResMut<NetworkHandler>, ptm: Res<PathToEntityMap>) {
+pub fn sys_process_navigation_inputs_warp(mut players: Query<(&PlayerController, &mut Navigation, &Ship)>, warp_targets: Query<&WarpTarget>, transforms: Query<&Transform>, n: ResMut<NetworkHandler>, ptm: Res<PathToEntityMap>, mut ein: EventWriter<EInfo>) {
     for entry in n.view_incoming().iter() {
         let msgs = entry.value();
         let player = entry.key();
         for msg in msgs.iter() {
             match msg {
-                NetIncomingMessage::WarpTo(ship_path, dst, dist) => update_navigation_warp(&mut players, &warp_targets, &transforms, &ptm, ship_path, &dst, player, *dist),
+                NetIncomingMessage::WarpTo(ship_path, dst, dist) => update_navigation_warp(&mut players, &warp_targets, &transforms, &ptm, ship_path, &dst, player, *dist, &mut ein),
                 _ => ()
             }
         }
@@ -69,7 +71,7 @@ pub fn sys_process_navigation_inputs_warp(mut players: Query<(&PlayerController,
 }
 
 //TODO: Add visibility check
-fn update_navigation_warp(q: &mut Query<(&PlayerController, &mut Navigation, &Ship)>, warp_targets: &Query<&WarpTarget>, transforms: &Query<&Transform>, ptm: &Res<PathToEntityMap>, ship_path: &ObjPath, dst: &ObjPath, player: &String, dist: f64) {
+fn update_navigation_warp(q: &mut Query<(&PlayerController, &mut Navigation, &Ship)>, warp_targets: &Query<&WarpTarget>, transforms: &Query<&Transform>, ptm: &Res<PathToEntityMap>, ship_path: &ObjPath, dst: &ObjPath, player: &String, dist: f64, ein: &mut EventWriter<EInfo>) {
     // get ship entity
     let ship_ent = match ptm.get(ship_path){
         Some(s) => s,
@@ -86,18 +88,21 @@ fn update_navigation_warp(q: &mut Query<(&PlayerController, &mut Navigation, &Sh
     }
 
     if ship_path.sys != dst.sys {
-        eprintln!("Player trying to warp to object in other system TODO: ALERT THEM");
+        ein.send(EInfo::Error(player.clone(), String::from("Warp target no longer in system")));
+        //eprintln!("Player trying to warp to object in other system TODO: ALERT THEM");
         return;
     }
 
     if nav.warp_state == WarpState::Warping {
-        eprintln!("TODO: alert player that they can't issue nav commands while warping");
+        ein.send(EInfo::Error(player.clone(), String::from("You cannot issue navigation commands while warping")));
+        //eprintln!("TODO: alert player that they can't issue nav commands while warping");
         return;
     }
 
     let target_ent = match ptm.get(dst) {
         Some(d) => d,
         None => {
+            ein.send(EInfo::Error(player.clone(), String::from("Warp target not found")));
             eprintln!("Warp target entity not found");
             return;
         }
@@ -109,7 +114,8 @@ fn update_navigation_warp(q: &mut Query<(&PlayerController, &mut Navigation, &Sh
             match transforms.get(target_ent) {
                 Ok(t) => NavTarget::Obj(dst.clone()),
                 Err(_) => {
-                    eprintln!("Invalid warp target");
+                    ein.send(EInfo::Error(player.clone(), String::from("That is not a valid warp target")));
+                    //eprintln!("Invalid warp target");
                     return;
                 }
             }
@@ -122,10 +128,15 @@ fn update_navigation_warp(q: &mut Query<(&PlayerController, &mut Navigation, &Sh
 }
 
 /// UDPATES THE POSITIONS OF ALL THE NAVIGATION TARGETS, MUST BE RUN BEFORE sys_tick_navigation
-pub fn sys_navigation_update_transform_positions(mut q: Query<&mut Navigation>, transforms: Query<&Transform>, ptm: Res<PathToEntityMap>) {
-    q.par_for_each_mut(128, |mut nav| {
+pub fn sys_navigation_update_transform_positions(mut q: Query<(&mut Navigation, &Sensor)>, transforms: Query<&Transform>, ptm: Res<PathToEntityMap>) {
+    q.par_for_each_mut(128, |(mut nav, sensor)| {
         let (point, vel) = match &nav.target {
             NavTarget::Obj(o) => {
+                if !sensor.visible_objs.contains(o) && !sensor.lockable_objs.contains(o) {
+                    nav.reset(); //TODO: send lost track of entity message
+                    return;
+                }
+
                 let ent = match ptm.get(&o) {
                     Some(e) => e,
                     None => { nav.reset(); return; }

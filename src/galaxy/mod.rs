@@ -8,6 +8,7 @@ use self::{runner::{schedule::generate_schedule, init_resources::init_resources}
 pub mod components;
 pub mod resources;
 pub mod bundles;
+pub mod events;
 mod runner;
 mod systems;
 
@@ -26,7 +27,7 @@ impl Galaxy {
         }
     }
 
-    pub fn tick(&mut self, dt: f64) {
+    fn tick(&mut self, dt: f64) {
         self.schedule.run(&mut self.world);
     }
 
@@ -34,7 +35,12 @@ impl Galaxy {
         self.world.get_resource::<NetworkHandler>().unwrap().queue_incoming(player, msg);
     }
 
-    pub fn dump_outgoing_messages(&mut self) -> DashMap<String, Vec<NetOutgoingMessage>> {
+    fn dump_outgoing_messages(&mut self) -> DashMap<String, Vec<NetOutgoingMessage>> {
         self.world.get_resource_mut::<NetworkHandler>().unwrap().finish_cycle()
+    }
+
+    pub fn run_cycle(&mut self, dt: f64) -> DashMap<String, Vec<NetOutgoingMessage>> {
+        self.tick(dt);
+        self.dump_outgoing_messages()
     }
 }

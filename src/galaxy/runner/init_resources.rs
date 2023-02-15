@@ -1,6 +1,6 @@
-use bevy_ecs::prelude::*;
+use bevy_ecs::{prelude::*, event::Event};
 
-use crate::db::database::DB;
+use crate::{db::database::DB, galaxy::events::{EEvent, EInfo, EState}};
 
 use super::super::resources::*;
 
@@ -16,5 +16,7 @@ pub fn init_resources<'a>(world: &mut World, db: DB) {
     world.insert_resource(network_table);
     world.insert_resource(db_res);
     world.insert_resource(dt_res);
-    
+    world.init_resource::<Events<EEvent>>();
+    world.init_resource::<Events<EInfo>>();
+    world.init_resource::<Events<EState>>();
 }

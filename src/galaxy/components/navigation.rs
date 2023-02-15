@@ -1,10 +1,10 @@
 use bevy_ecs::prelude::*;
 use nalgebra::Vector3;
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 
 use crate::shared::ObjPath;
 
-#[derive(Debug, Serialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Clone, PartialEq, Deserialize)]
 pub enum Action {
     Warp(f64),
     Orbit(f64),
@@ -14,14 +14,14 @@ pub enum Action {
     None
 }
 
-#[derive(Debug, Serialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub enum WarpState {
     Aligning,
     Warping,
     NotWarping
 }
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum NavTarget {
     Obj(ObjPath),
     Point(Vector3<f64>),

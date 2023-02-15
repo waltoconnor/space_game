@@ -21,7 +21,6 @@ impl BPlayerShip {
         };
 
         let nav = Navigation::new();
-
         let go = GameObject::new(system, crate::shared::ObjectType::PlayerShip, ship_name);
 
         BPlayerShip { ship: ship, transform: transform, pc: pc, nav: nav, game_obj: go, sig: Signature::new(10.0), sensor: Sensor::new() }

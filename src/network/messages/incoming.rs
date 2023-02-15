@@ -6,6 +6,8 @@ use crate::shared::ObjPath;
 
 #[derive(Debug, Deserialize)]
 pub enum NetIncomingMessage {
+    /* LOGIN */
+    Login(String, String), //player name, access token
 
     /* Motion */
     WarpTo(ObjPath, ObjPath, f64), //ship, dst, dist
