@@ -28,7 +28,7 @@ pub enum NavTarget {
     None
 }
 
-#[derive(Component, Debug)]
+#[derive(Component, Debug, Serialize, Deserialize, Clone)]
 pub struct Navigation {
     pub cur_action: Action,
     pub warp_state: WarpState,

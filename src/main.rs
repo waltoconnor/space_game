@@ -32,11 +32,14 @@ fn main() {
 
         //disperse messages
         for (player, msg) in msgs_in {
+            println!("{:?}", msg);
             // handle logins
-            match &msg {
+            let is_valid_player = match &msg {
                 network::messages::incoming::NetIncomingMessage::Login(name, token) => special::new_player::handle_new_player(&gal, name, token, &server, &config),
-                _ => ()
-            }
+                _ => true
+            };
+
+            if !is_valid_player { continue; }
             gal.queue_incoming_message(&player, msg);
         }
 

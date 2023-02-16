@@ -1,5 +1,5 @@
 use bevy_ecs::prelude::*;
-use crate::{galaxy::{resources::{path_to_entity::PathToEntityMap, network_handler::NetworkHandler, star_system_table::SystemMapTable}, events::EEvent}, network::{serialization_structs::state::{SSystem, SPlayerShip_OTHER, NetOutState, SPlayerShip_OWN}, messages::outgoing::NetOutgoingMessage}};
+use crate::{galaxy::{resources::{path_to_entity::PathToEntityMap, network_handler::NetworkHandler, star_system_table::SystemMapTable, database_resource::DatabaseResource}, events::EEvent, bundles::ships::BPlayerShip}, network::{serialization_structs::{state::{SSystem, SPlayerShip_OTHER, NetOutState, SPlayerShip_OWN}, event::NetOutEvent, info::NetOutInfo}, messages::{outgoing::NetOutgoingMessage, incoming::NetIncomingMessage}}, shared::ObjectType};
 
 use super::super::components::*;
 
@@ -51,6 +51,11 @@ pub fn sys_dispatch_other_ships(
     ptm: Res<PathToEntityMap>,
 ){
     sensor.par_for_each(16, |(pc, s)|{
+        match pc.login_state {
+            LoginState::LoggedOut(_) => { /* println!("Ship for {} logged out", pc.player_name); */ return; },
+            _ => ()
+        };
+
         let visible = s.visible_objs.iter().filter_map(|obj| ptm.get(obj)); // just silently ignore broken stuff, TODO: DEAL WITH THIS
         for v in visible {
             let (os, opc, ogo, ot) = match ships.get(v) {
@@ -76,6 +81,11 @@ pub fn sys_dispatch_own_ship(
     net: Res<NetworkHandler>
 ){
     ships.par_for_each(16, |(s, pc, go, t, n)| {
+        match pc.login_state {
+            LoginState::LoggedOut(_) => { return; },
+            _ => ()
+        };
+
         let ship = SPlayerShip_OWN {
             path: go.path.clone(),
             ship_class: s.ship_class.clone(),
@@ -90,3 +100,18 @@ pub fn sys_dispatch_own_ship(
         net.enqueue_outgoing(&pc.player_name, NetOutgoingMessage::State(NetOutState::OwnShip(ship)));
     })
 }
+
+pub fn sys_dispatch_ev_dock_undock(
+    mut eev: EventReader<EEvent>,
+    net: Res<NetworkHandler>
+){
+    for e in eev.iter() {
+        match e {
+            EEvent::Dock(player, station) => net.enqueue_outgoing(player, NetOutgoingMessage::Event(NetOutEvent::Undock(station.clone()))),
+            EEvent::Undock(player, ship) => net.enqueue_outgoing(player, NetOutgoingMessage::Event(NetOutEvent::Undock(ship.clone()))),
+            _ => ()
+        }
+    }
+}
+
+

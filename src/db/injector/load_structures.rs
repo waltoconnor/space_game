@@ -20,7 +20,7 @@ pub fn load_stations(input_stations: LStationList, planets: &HashMap<String, BPl
         let abs = planet.transform.pos + offset;
         let face_away_from_planet = UnitQuaternion::face_towards(&offset, &Vector3::y_axis());
         //TODO: ADD ACTUAL LOGIC FOR THIS
-        let warp_point = offset + (offset.normalize() * 1000.0); // warp in 1KM away from hanger door
+        let warp_point = abs + (offset.normalize() * 1000.0); // warp in 1KM away from hanger door
         let undock_offset = face_away_from_planet.transform_vector(&Vector3::new(0.0, 0.0, 1000.0)); // 1km offset 
 
         let transform = Transform { pos: abs, rot: face_away_from_planet, vel: Vector3::zeros() };

@@ -8,6 +8,6 @@ pub fn update_path_table(q: Query<(Entity, &GameObject), Changed<GameObject>>, m
     }
 }
 
-pub fn path_table_removal_hook(_e: Entity, obj: &GameObject, path_table: &mut PathToEntityMap) {
-    path_table.remove(&obj.path);
+pub fn path_table_removal_hook(e: Entity, path_table: &mut PathToEntityMap) {
+    path_table.remove_by_ent(e);
 }

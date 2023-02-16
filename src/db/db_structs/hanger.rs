@@ -6,8 +6,8 @@ use crate::galaxy::components::Ship;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct PlayerHanger {
-    inventory: HashMap<u32, Ship>,
-    active: Option<Ship>
+    pub inventory: HashMap<u32, Ship>,
+    pub active: Option<Ship>
 }
 
 impl PlayerHanger {

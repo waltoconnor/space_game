@@ -18,6 +18,9 @@ impl NetworkHandler {
     }
 
     pub fn enqueue_outgoing(&self, player: &String, message: NetOutgoingMessage) {
+        if !self.outgoing.contains_key(player) {
+            self.outgoing.insert(player.clone(), vec![]);
+        }
         self.outgoing.get_mut(player).and_then(|mut p| Some(p.push(message)));
     }
 
@@ -27,6 +30,10 @@ impl NetworkHandler {
     }
 
     pub fn queue_incoming(&self, player: &String, message: NetIncomingMessage) {
+        if !self.incoming.contains_key(player) {
+            self.incoming.insert(player.clone(), vec![]);
+        }
+
         self.incoming
             .get_mut(player)
             .and_then(|mut p| Some(p.push(message)));

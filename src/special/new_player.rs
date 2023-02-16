@@ -1,14 +1,34 @@
-use crate::{galaxy::{Galaxy, resources::database_resource::DatabaseResource}, network::{server::ServerHandle, self}, shared::{ObjPath, self}, config::Config, db};
+use crate::{galaxy::{Galaxy, resources::{database_resource::DatabaseResource, path_to_entity::PathToEntityMap}, components::{Ship, Stats, Hanger, Station}}, network::{server::ServerHandle, self}, shared::{ObjPath, self}, config::Config, db};
 
-
-pub fn handle_new_player(gal: &Galaxy, name: &String, token: &String, server: &ServerHandle, config: &Config) {
+/// returns if login was successful
+pub fn handle_new_player(gal: &Galaxy, name: &String, token: &String, server: &ServerHandle, config: &Config) -> bool{
     let db = &gal.world.get_resource::<DatabaseResource>().expect("Could not get database resource").db;
     match db.account_try_login(&name, &token) {
-        db::database::LoginStatus::Good => server.send_message_to_player(name.clone(), crate::network::messages::outgoing::NetOutgoingMessage::LoginOk),
-        db::database::LoginStatus::BadPass => server.send_message_to_player(name.clone(), network::messages::outgoing::NetOutgoingMessage::LoginBad),
+        db::database::LoginStatus::Good => { server.send_message_to_player(name.clone(), crate::network::messages::outgoing::NetOutgoingMessage::LoginOk); true },
+        db::database::LoginStatus::BadPass => { server.send_message_to_player(name.clone(), network::messages::outgoing::NetOutgoingMessage::LoginBad); false },
         db::database::LoginStatus::NoAccount => {
-            db.account_create(&name, &token, ObjPath::new(&config.gameplay_config.starting_system, shared::ObjectType::Station, &config.gameplay_config.starting_station));
-            server.send_message_to_player(name.clone(), network::messages::outgoing::NetOutgoingMessage::LoginOk)
+            let starter_station_path = ObjPath::new(&config.gameplay_config.starting_system, shared::ObjectType::Station, &config.gameplay_config.starting_station);
+            let starter_station = gal.world.get_resource::<PathToEntityMap>().expect("Could not get path to entity map for new player").get(&starter_station_path).expect("Starter station not found in world");
+            let sh = gal.world.get::<Hanger>(starter_station).expect("Could not get starter hanger component"); 
+            db.account_create(&name, &token, starter_station_path);
+            db.hanger_add_ship(&name, sh.hanger_uid, Ship { 
+                ship_name: String::from("New ship"),
+                ship_class: String::from("Test Ship"),
+                stats: Stats {
+                    warp_speed_ms: 1.496e11,
+                    thrust_n: 100.0,
+                    ang_vel_rads: 1.0,
+                    mass_kg: 10.0,
+                }
+            });
+
+            let cur_hanger = db.hanger_get_ships(&name, sh.hanger_uid).expect("Could not get ships from new player hanger");
+            let slot = cur_hanger.inventory.keys().last().expect("Could not get last key in hanger");
+            db.hanger_set_active_ship_slot(name, sh.hanger_uid, *slot);
+            // let cur_hanger = db.hanger_get_ships(&name, sh.hanger_uid).expect("Could not get ships from new player hanger");
+            // println!("{:?}", cur_hanger);
+            server.send_message_to_player(name.clone(), network::messages::outgoing::NetOutgoingMessage::LoginOk);
+            true
         }
-    };
+    }
 }

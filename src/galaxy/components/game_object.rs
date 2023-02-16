@@ -1,8 +1,9 @@
 use bevy_ecs::prelude::*;
+use serde::{Deserialize, Serialize};
 
 use crate::shared::{ObjPath, ObjectType};
 
-#[derive(Component)]
+#[derive(Component, Deserialize, Serialize, Debug, Clone)]
 pub struct GameObject {
     pub path: ObjPath
 }

@@ -99,7 +99,8 @@ fn server_thread(addr: SocketAddrV4, server_receive_pipe: Sender<(String, NetInc
 
             let mut tmp_queue = vec![];
 
-            let mut name;
+            let mut name = String::new();
+            let mut token;
 
             //first loop waits for the intro message and discards everything else
             'login: loop {
@@ -108,38 +109,41 @@ fn server_thread(addr: SocketAddrV4, server_receive_pipe: Sender<(String, NetInc
                     Err(_) => { continue; }
                 };
                 if msg.is_text() {
-                    let intro: IntroMessage = match from_str::<IntroMessage>(msg.into_text().expect("Could not process websocket message as text").as_str()) {
-                        Ok(m) => m,
+                    (name, token) = match from_str::<NetIncomingMessage>(msg.into_text().expect("Could not process websocket message as text").as_str()) {
+                        Ok(m) => match m {
+                            NetIncomingMessage::Login(name, token) => (name, token),
+                            _ => { continue; }
+                        },
                         Err(_) => { 
                             println!("Intro message malformed");
-                            let res = IntroMessageResponse { status: String::from("BAD") };
+                            let res = NetOutgoingMessage::LoginBad;
                             websocket.write_message(serde_json::to_string(&res).expect("Could not serialize error message").into()).expect("Could not send error message");
                             continue; 
                         }
                     };
 
-                    if local_send_to_player_map.contains_key(&intro.name) {
+                    if local_send_to_player_map.contains_key(&name) {
                         println!("Player is already logged in, relogging under new account");
                     }
 
-                    println!("Player connecting: {}", &intro.name);
+                    println!("Player connecting: {}", &name);
 
                     // let login_msg = FromPlayerMessage {
                     //     player: intro.name.clone(),
                     //     data: crate::server::messages::incoming::ServerInMessage::LoginRequest(intro.access_token)
                     // };
-                    let login_msg = NetIncomingMessage::Login(intro.name.clone(), intro.access_token.clone());
+                    let login_msg = NetIncomingMessage::Login(name.clone(), token.clone());
 
-                    server_rec_pipe.send((intro.name.clone(), login_msg)).expect("Could not send server login message");
-                    local_send_to_player_map.insert(intro.name.clone(), Mutex::new(server_send_pipe.clone()));
+                    server_rec_pipe.send((name.clone(), login_msg)).expect("Could not send server login message");
+                    local_send_to_player_map.insert(name.clone(), Mutex::new(server_send_pipe.clone()));
 
                     'get_message: loop {
                         let result = local_receive_pipe.recv().expect("Did not get data back from server");
                         if match result { NetOutgoingMessage::LoginBad => true, _ => false } { //impl partialeq lmao
-                            local_send_to_player_map.remove(&intro.name);
-                            let res = IntroMessageResponse { status: String::from("BAD PASSWORD") };
+                            local_send_to_player_map.remove(&name);
+                            let res = NetOutgoingMessage::LoginBad;
                             websocket.write_message(serde_json::to_string(&res).expect("Could not serialize bad password message").into()).expect("Could not send bad password message");
-                            println!("Player {} failed login", &intro.name);
+                            println!("Player {} failed login", &name);
                             continue 'login; // LOOP BACK AND LET THEM TRY AGAIN
                         }
                         match result {
@@ -151,10 +155,10 @@ fn server_thread(addr: SocketAddrV4, server_receive_pipe: Sender<(String, NetInc
                             }
                         }
 
-                        println!("Player {} logged in", &intro.name);
+                        println!("Player {} logged in", &name);
                         
                         // WE ARE APPROVED TO LOG IN, SEND THE MESSAGE THEN DUMP ALL THE STORED UP MESSAGES THAT CAME OUT OF ORDER
-                        let res = IntroMessageResponse { status: String::from("OK") };
+                        let res = NetOutgoingMessage::LoginOk;
                         websocket.write_message(serde_json::to_string(&res).expect("Could not serialize ok message").into()).expect("Could not send ok message");
 
                         for msg in tmp_queue {
@@ -162,10 +166,11 @@ fn server_thread(addr: SocketAddrV4, server_receive_pipe: Sender<(String, NetInc
                             websocket.write_message(serde_json::to_string(&msg).expect("Could not serialize queued message").into()).expect("Could not send queued message");
                         }
 
-                        name = intro.name.clone();
+                        //name = intro.name.clone();
                         break 'login;
                     }
                 }
+                
             }
 
             //the server looks up our server_send_pipe in the hashmap and forwards data to our local_receive_pipe
@@ -176,7 +181,23 @@ fn server_thread(addr: SocketAddrV4, server_receive_pipe: Sender<(String, NetInc
                 //WAIT FOR PACKET UNTIL TIMEOUT
                 let msg = match websocket.read_message(){
                     Ok(msg) => msg, //IF WE GET A PACKET, HANDLE IT
-                    Err(_) => { //IF WE TIMEOUT, SEE IF WE HAVE ANYTHING TO SEND
+                    Err(e) => { //IF WE TIMEOUT, SEE IF WE HAVE ANYTHING TO SEND
+                        let closed = match e {
+                            tungstenite::Error::AlreadyClosed => true,
+                            tungstenite::Error::ConnectionClosed => true,
+                            _ => false
+                        };
+                        
+                        if closed {
+                            println!("Player {} disconnected", &name);
+                            if name != String::new() {
+                                local_send_to_player_map.remove(&name);
+                                websocket.close(None);
+                                server_rec_pipe.send((name.clone(), NetIncomingMessage::Disconnect)).expect("Could not send disconnect message");
+                                return;
+                            }
+                        }
+
                         while let Ok(tpm) = local_receive_pipe.try_recv() { //IF WE HAVE A PACKET FROM THE SERVER TO FORWARD, DO SO
                             //println!("Sending message to {}", tpm.player);
                             //println!("Msg: {:?}", tpm);
@@ -187,10 +208,19 @@ fn server_thread(addr: SocketAddrV4, server_receive_pipe: Sender<(String, NetInc
                         continue;
                     }
                 };
+
+                if msg.is_close() {
+                    println!("Player {} disconnected", &name);
+                    if name != String::new() {
+                        local_send_to_player_map.remove(&name);
+                        server_rec_pipe.send((name.clone(), NetIncomingMessage::Disconnect)).expect("Could not send disconnect message");
+                    }
+                }
                 
                 //IF WE ARE HERE, IT MEANS WE GOT A MESSAGE FROM THE PLAYER AND HAVE IT IN msg
                 //PARSE IT AND FORWARD IT TO THE SERVER
                 let player_msg: NetIncomingMessage = serde_json::from_str::<NetIncomingMessage>(msg.into_text().expect("Could not convert message to text").as_str()).expect("Could not deserialize message from player");
+                println!("Player msg: {:?}", player_msg);
                 server_rec_pipe.send((name.clone(), player_msg)).expect("Could not forward player message to server");
             }
         });

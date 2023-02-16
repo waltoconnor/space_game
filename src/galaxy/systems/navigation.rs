@@ -3,7 +3,7 @@ use std::{f64::consts::PI, sync::Mutex};
 use bevy_ecs::prelude::*;
 use nalgebra::{Vector3, UnitQuaternion};
 
-use crate::{galaxy::{components::*, resources::{network_handler::NetworkHandler, path_to_entity::PathToEntityMap, delta_time::DeltaTime}, events::{EInfo, EEvent}}, network::messages::incoming::NetIncomingMessage, shared::ObjPath};
+use crate::{galaxy::{components::*, resources::{network_handler::NetworkHandler, path_to_entity::PathToEntityMap, delta_time::DeltaTime}, events::{EInfo, EEvent}}, network::messages::incoming::NetIncomingMessage, shared::{ObjPath, ObjectType}};
 
 /// PROCESS NON WARP NAVIGATION MESSAGES
 /// Stage: COMMAND
@@ -49,6 +49,7 @@ fn update_navigation_local(q: &mut Query<(&PlayerController, &mut Navigation, &S
         return;
     }
 
+    //println!("{:?} ===> {:?}", ship_path, dst);
     nav.cur_action = op;
     nav.warp_state = WarpState::NotWarping;
     nav.target = NavTarget::Obj(dst.clone())
@@ -132,19 +133,20 @@ pub fn sys_navigation_update_transform_positions(mut q: Query<(&mut Navigation, 
     q.par_for_each_mut(128, |(mut nav, sensor)| {
         let (point, vel) = match &nav.target {
             NavTarget::Obj(o) => {
-                if !sensor.visible_objs.contains(o) && !sensor.lockable_objs.contains(o) {
+                if !is_static(o.t) && !sensor.visible_objs.contains(o) && !sensor.lockable_objs.contains(o) {
+                    //eprintln!("Lost entity");
                     nav.reset(); //TODO: send lost track of entity message
                     return;
                 }
 
                 let ent = match ptm.get(&o) {
                     Some(e) => e,
-                    None => { nav.reset(); return; }
+                    None => { nav.reset(); /* eprintln!("Lost entity 2"); */ return; }
                 };
 
                 let transform: &Transform = match transforms.get(ent) {
                     Ok(t) => t,
-                    Err(_) => { nav.reset(); return; }
+                    Err(_) => { nav.reset(); /* eprintln!("Lost entity 3"); */ return; }
                 };
                 (transform.pos, Some(transform.vel))
             },
@@ -156,15 +158,27 @@ pub fn sys_navigation_update_transform_positions(mut q: Query<(&mut Navigation, 
     });
 }
 
+fn is_static(t: ObjectType) -> bool {
+    match t {
+        ObjectType::AsteroidBelt => true,
+        ObjectType::Gate => true,
+        ObjectType::Planet => true,
+        ObjectType::Star => true,
+        ObjectType::Station => true,
+        _ => false
+    }
+}
+
 /// TICKS NAVIGATION FOR ALL THINGS, NOT JUST PLAYERS
 /// Stage: ACTION
 // TODO: make this respect visibility rules
 pub fn sys_tick_navigation(mut q: Query<(&mut Navigation, &Ship, &mut Transform)>, ptm: Res<PathToEntityMap>, dt: Res<DeltaTime>) {
     q.par_for_each_mut(32, |(mut nav, ship, mut ship_transform)| {
+        //println!("nav tick");
         let vel = nav.cur_target_vel;
         match nav.cur_target_pos {
             Some(ctp) => update_navigation(&mut nav, ship, &mut ship_transform, ctp, vel, dt.dt),
-            None => ()
+            None => { /*println!("No target pos");*/ }
         };
     });
 }
@@ -177,6 +191,7 @@ pub fn sys_tick_navigation(mut q: Query<(&mut Navigation, &Ship, &mut Transform)
 // }
 
 fn update_navigation(nav: &mut Navigation, ship: &Ship, transform: &mut Transform, target_pos: Vector3<f64>, target_vel: Option<Vector3<f64>>, dt: f64) {
+    //println!("{:#?}", nav);
     match nav.cur_action {
         Action::Warp(t) => handle_warp_to(nav, ship, transform, target_pos, dt, t),
         Action::AlignTo => handle_align_to(nav, ship, transform, target_pos, dt),
@@ -213,25 +228,35 @@ fn handle_warp_to(nav: &mut Navigation, ship: &Ship, transform: &mut Transform, 
             // we want to warp to a point n meters away from the object
             let real_target_point = transform.pos.lerp(&target_pos, 1.0 - (target_dist / dist_to_object));
             let real_dist = transform.pos.metric_distance(&real_target_point);
+            
 
             if real_dist < 1.0 { //1 meter
-                nav.cur_action = Action::None;
-                nav.target = NavTarget::None;
-                nav.warp_state = WarpState::NotWarping;
+                nav.reset();
             }
 
             let lerp_amount = ((ship.stats.warp_speed_ms * dt) / real_dist).min(1.0);
-            transform.pos = transform.pos.lerp(&real_target_point, lerp_amount);
+            if lerp_amount > 0.99 {
+                transform.pos = real_target_point;
+                nav.reset();
+            }
+            else {
+                transform.pos = transform.pos.lerp(&real_target_point, lerp_amount);
+            }
+
+            println!("Dist from actual and target: {}, real_dist: {}, lerp: {}", target_pos.metric_distance(&real_target_point), real_dist, lerp_amount);
+            
         }
     }
 }
 
 fn handle_align_to(nav: &mut Navigation, ship: &Ship, transform: &mut Transform, target_pos: Vector3<f64>, dt: f64) {
+    //println!("Aligning t={:?}", transform);
     let diff = target_pos - transform.pos;
     align_to_vector(transform, ship, diff, dt)
 }
 
 fn handle_approach(nav: &mut Navigation, ship: &Ship, transform: &mut Transform, target_pos: Vector3<f64>, target_vel: Option<Vector3<f64>>, dt: f64) {
+    //println!("Approaching t={:?}", transform);
     let tvel = match target_vel { Some(v) => v, None => Vector3::zeros() };
     let rel_vel = tvel - transform.vel;
 
@@ -269,6 +294,7 @@ fn handle_approach(nav: &mut Navigation, ship: &Ship, transform: &mut Transform,
         let cur_accel = (max_accel).min(needed_accel); 
         align_to_vector(transform, ship, direction_vec, dt);
         if is_aligned(transform, direction_vec, 0.1) {
+            //println!("Burning to correct error");
             // compute the acceleration vector given our current engine direction, and apply the burn
 
             let dv = transform.rot.transform_vector(&Vector3::new(0.0, 0.0, cur_accel)) * dt;
@@ -277,6 +303,7 @@ fn handle_approach(nav: &mut Navigation, ship: &Ship, transform: &mut Transform,
     }
     else {
         // we are in the final third, slow down
+        //println!("Killing relative velocity");
         kill_relative_velocity(nav, ship, transform, target_pos, target_vel, dt);
     }
 }
@@ -284,7 +311,12 @@ fn handle_approach(nav: &mut Navigation, ship: &Ship, transform: &mut Transform,
 fn kill_relative_velocity(nav: &mut Navigation, ship: &Ship, transform: &mut Transform, target_pos: Vector3<f64>, target_vel: Option<Vector3<f64>>, dt: f64) {
     let tvel = match target_vel { Some(v) => v, None => Vector3::zeros() };
     let rel_vel = tvel - transform.vel;
-    let burn_dir = -1.0 * rel_vel.normalize();
+
+    if rel_vel.magnitude() < 5.0 && transform.pos.metric_distance(&target_pos) < 500.0 {
+        transform.vel = tvel;
+    }
+
+    let burn_dir = rel_vel.normalize();
     align_to_vector(transform, ship, burn_dir, dt);
     if is_aligned(transform, burn_dir, 0.01) {
         let max_accel = ship.stats.thrust_n / ship.stats.mass_kg;
@@ -314,6 +346,7 @@ fn align_to_vector(transform: &mut Transform, ship: &Ship, v: Vector3<f64>, dt: 
     let rot_to_target = UnitQuaternion::face_towards(&v, &up);
     let angle_to = transform.rot.angle_to(&rot_to_target);
     let slerp_amount = ((ship.stats.ang_vel_rads * dt) / angle_to).min(1.0);
+    //println!("slerp: {}", slerp_amount);
     transform.rot = transform.rot.slerp(&rot_to_target, slerp_amount);
 }
 
@@ -339,6 +372,7 @@ pub fn sys_tick_transforms(mut t: Query<&mut Transform>, dt: Res<DeltaTime>) {
     // }
     t.par_for_each_mut(500, |mut transform| {
         let vel = transform.vel;
-        transform.pos += vel * dt.dt});
+        transform.pos += vel * dt.dt
+    });
 }
 

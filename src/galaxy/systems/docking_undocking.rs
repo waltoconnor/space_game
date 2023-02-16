@@ -71,10 +71,19 @@ fn handle_dock(players: &Query<(&PlayerController, &Ship, &Transform)>, hangers:
     db.db.account_change_location(player_name, station.clone());
     eev.send(EEvent::Dock(player_name.clone(), station.clone()));
     commands.entity(docking_ent).despawn();
-
 }
 
 fn handle_undock(hangers: &Query<(&Hanger, &Transform)>, ptm: &Res<PathToEntityMap>, hanger_path: &ObjPath, db: &Res<DatabaseResource>, player_name: &String, commands: &mut Commands, eev: &mut EventWriter<EEvent>, ein: &mut EventWriter<EInfo>) {
+    let loc = match db.db.account_get_location(player_name) {
+        Some(loc) => loc,
+        None => { eprintln!("Player has no location when trying undock"); return; }
+    };
+
+    if loc != *hanger_path {
+        eprintln!("Player trying to undock from hanger they are not in");
+        ein.send(EInfo::Error(player_name.clone(), String::from("You cannot undock from a station you are not in")));
+    }
+
     let hanger_ent = match ptm.get(hanger_path) {
         Some(h) => h,
         None => {

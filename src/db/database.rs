@@ -3,8 +3,8 @@ use std::{collections::HashMap, fmt::Debug};
 use serde::{Serialize, Deserialize};
 use sled::{Tree, Db, IVec};
 
-use crate::{shared::ObjPath, galaxy::components::Ship};
-use super::{db_consts::*, db_structs::{account::*, hanger::PlayerHanger}};
+use crate::{shared::ObjPath, galaxy::{components::{Ship, GameObject, Navigation, Transform}, bundles::ships::BPlayerShip}};
+use super::{db_consts::*, db_structs::{account::*, hanger::PlayerHanger, ship_in_space::ShipInSpace}};
 use rmp_serde::{to_vec, from_slice};
 
 pub struct DB {
@@ -240,6 +240,27 @@ impl DB {
     /* PRODUCTION */
 
     /* SHIPS IN SPACE */
+
+    pub fn db_load_ship(&self, name: &String) -> Option<BPlayerShip> {
+        match self.ships_in_space.remove(name.as_bytes()).expect("Could not read ship from db") {
+            Some(s) => {
+                let ship: ShipInSpace = self.deser(&s);
+                Some(BPlayerShip::load_from_db(ship.ship, &ship.player_name, ship.navigation, ship.transform, ship.game_object))
+            },
+            None => None
+        }
+    }
+
+    pub fn db_save_ship(&self, name: &String, ship: &Ship, nav: &Navigation, transform: &Transform, game_obj: &GameObject) {
+        let ss = ShipInSpace {
+            player_name: name.clone(),
+            ship: ship.clone(),
+            navigation: nav.clone(),
+            transform: transform.clone(),
+            game_object: game_obj.clone()
+        };
+        self.ships_in_space.insert(name.as_bytes(), self.ser(&ss)).expect("Could not save ship");
+    }
 
     /* STATISTICS */
 

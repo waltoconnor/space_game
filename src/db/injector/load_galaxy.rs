@@ -95,7 +95,7 @@ pub fn load_moons(loaded_gal: &LGalaxy, planets: &HashMap<String, BPlanet>) -> H
                 for m in planet.moons.iter() {
                     let moon_type = format!("{:?}", m.body_info.planet_type);
 
-                    let orbit = Orbit::from_arr(&planet.orbit.into_arr(), planet.body_info.mass_kg);
+                    let orbit = Orbit::from_arr(&m.orbit.into_arr(), planet.body_info.mass_kg);
                     let [x, y, z, _, _, _] = orbit_to_csv(&orbit, planet.body_info.mass_kg);
                     let offset = Vector3::new(x, y, z) + bplanet.transform.pos;
     
@@ -110,7 +110,7 @@ pub fn load_moons(loaded_gal: &LGalaxy, planets: &HashMap<String, BPlanet>) -> H
                     let warp_in_point = Orbit::new(dist, 0.0, 0.0, 0.0, 0.0, PI / 2.0, m.body_info.mass_kg);
                     let [wip_x, wip_y, wip_z, _, _, _] = orbit_to_csv(&warp_in_point, m.body_info.mass_kg);
                     let warp_in_arr = [wip_x, wip_y, wip_z];
-                    let warp_point = Vector3::from(warp_in_arr);
+                    let warp_point = Vector3::from(warp_in_arr) + offset;
                 
     
                     let bmoon = BMoon::new(sys_name, &m.name, &moon_type, planet.body_info.size_m, planet.body_info.mass_kg, offset, rot, warp_point);

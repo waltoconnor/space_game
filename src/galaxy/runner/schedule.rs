@@ -39,12 +39,15 @@ pub fn generate_schedule() -> Schedule {
     // things that might die get checked for death here, and scheduled for kill if needed
     let mut death_stage = SystemStage::parallel();
 
+    death_stage.add_system(safe_logout::sys_dispatch_login_info);
+
     // sends messages to everyone about what happened
     let mut network_out_stage = SystemStage::parallel();
     network_out_stage.add_system(network_msg_generator::sys_dispatch_static_data);
     network_out_stage.add_system(network_msg_generator::sys_dispatch_other_ships);
     network_out_stage.add_system(network_msg_generator::sys_dispatch_own_ship);
-    
+    network_out_stage.add_system(network_msg_generator::sys_dispatch_ev_dock_undock);
+
     // all the bookkeeping for jumps, docks, and undocks is handled here
     let mut update_stage = SystemStage::parallel();
     update_stage

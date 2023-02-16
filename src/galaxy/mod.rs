@@ -3,7 +3,7 @@ use dashmap::DashMap;
 
 use crate::{db::database::DB, network::messages::{incoming::NetIncomingMessage, outgoing::NetOutgoingMessage}};
 
-use self::{runner::{schedule::generate_schedule, init_resources::init_resources}, resources::network_handler::NetworkHandler};
+use self::{runner::{schedule::generate_schedule, init_resources::init_resources}, resources::{network_handler::NetworkHandler, delta_time::DeltaTime}};
 
 pub mod components;
 pub mod resources;
@@ -28,6 +28,7 @@ impl Galaxy {
     }
 
     fn tick(&mut self, dt: f64) {
+        self.world.get_resource_mut::<DeltaTime>().unwrap().dt = dt;
         self.schedule.run(&mut self.world);
     }
 
@@ -41,6 +42,7 @@ impl Galaxy {
 
     pub fn run_cycle(&mut self, dt: f64) -> DashMap<String, Vec<NetOutgoingMessage>> {
         self.tick(dt);
+        self.world.clear_trackers();
         self.dump_outgoing_messages()
     }
 }
