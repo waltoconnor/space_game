@@ -1,6 +1,10 @@
+use std::collections::HashMap;
+
 use bevy_ecs::world::World;
 
-use self::{galaxy_structs::LGalaxy, structure_structs::LStationList};
+use crate::inventory::{ItemTable, ItemId};
+
+use self::{galaxy_structs::LGalaxy, structure_structs::LStationList, load_items::LItem};
 
 mod orbit;
 
@@ -9,6 +13,8 @@ mod load_galaxy;
 
 mod structure_structs;
 mod load_structures;
+
+mod load_items;
 
 pub fn inject_statics(path_to_assets: String) -> World {
     let mut world = World::default();
@@ -39,4 +45,10 @@ pub fn inject_statics(path_to_assets: String) -> World {
 
 
     world
+}
+
+pub fn load_items(path_to_assets: String) -> ItemTable {
+    let items_file = std::fs::read_to_string(format!("{}/items.json", path_to_assets)).expect("Could not read item file");
+    let items: HashMap<ItemId, LItem> = serde_json::from_str(items_file.as_str()).expect("Could not parse items file");
+    load_items::load_item(items)
 }

@@ -1,5 +1,5 @@
 use bevy_ecs::prelude::*;
-use crate::{galaxy::{resources::{path_to_entity::PathToEntityMap, network_handler::NetworkHandler, star_system_table::SystemMapTable, database_resource::DatabaseResource}, events::EEvent, bundles::ships::BPlayerShip}, network::{serialization_structs::{state::{SSystem, SPlayerShip_OTHER, NetOutState, SPlayerShip_OWN}, event::NetOutEvent, info::NetOutInfo}, messages::{outgoing::NetOutgoingMessage, incoming::NetIncomingMessage}}, shared::ObjectType};
+use crate::{galaxy::{resources::{path_to_entity::PathToEntityMap, network_handler::NetworkHandler, star_system_table::SystemMapTable, database_resource::DatabaseResource}, events::{EEvent, EInfo}, bundles::ships::BPlayerShip}, network::{serialization_structs::{state::{SSystem, SPlayerShip_OTHER, NetOutState, SPlayerShip_OWN}, event::NetOutEvent, info::{NetOutInfo, hanger::SHanger}}, messages::{outgoing::NetOutgoingMessage, incoming::NetIncomingMessage}}, shared::ObjectType};
 
 use super::super::components::*;
 
@@ -115,3 +115,26 @@ pub fn sys_dispatch_ev_dock_undock(
 }
 
 
+pub fn sys_dispatch_inv_updates(
+    mut inf: EventReader<EInfo>,
+    net: Res<NetworkHandler>,
+    db: Res<DatabaseResource>
+){
+    for e in inf.iter(){
+        match e {
+            EInfo::UpdateInventoryHanger(player, hanger_id) => {
+                let hanger = db.db.hanger_get_ships(player, *hanger_id);
+                if let Some(h) = hanger {
+                    net.enqueue_outgoing(player, NetOutgoingMessage::Info(NetOutInfo::Hanger(SHanger::from_hanger(&h, *hanger_id))))
+                }
+            },
+            EInfo::UpdateInventoryId(player, inv_id) => {
+                let inv = db.db.inventory_get_inv(player, *inv_id);
+                if let Some(i) = inv {
+                    net.enqueue_outgoing(player, NetOutgoingMessage::Info(NetOutInfo::Inventory(i, *inv_id)));
+                }
+            },
+            _ => ()
+        }
+    }
+}

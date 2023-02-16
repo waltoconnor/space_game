@@ -45,7 +45,7 @@ pub fn sys_dispatch_login_info(
                     }
 
                     if loc.t == ObjectType::PlayerShip {
-                        match db.db.db_load_ship(player) {
+                        match db.db.sis_load_ship(player) {
                             Some(s) => command.spawn(BPlayerShip::load_from_db(s.ship, player, s.nav, s.transform, s.game_obj)),
                             None => {
                                 eprintln!("Ship not found in db, TODO: reset player to home");
@@ -106,7 +106,7 @@ pub fn sys_dispatch_login_info(
         if elapsed > 10 {
             transform.vel = Vector3::zeros();
             eprintln!("TODO: add safe logout duration as setting");
-            db.db.db_save_ship(&pc.player_name, ship, &nav, &transform, go);
+            db.db.sis_save_ship(&pc.player_name, ship, &nav, &transform, go);
             command.entity(ent).despawn();
         }
     });

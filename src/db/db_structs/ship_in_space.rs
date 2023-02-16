@@ -1,6 +1,6 @@
 use serde::{Serialize, Deserialize};
 
-use crate::galaxy::components::{Ship, Navigation, Transform, GameObject, PlayerController};
+use crate::galaxy::components::{Ship, Navigation, Transform, GameObject};
 
 
 #[derive(Serialize, Deserialize, Debug)]

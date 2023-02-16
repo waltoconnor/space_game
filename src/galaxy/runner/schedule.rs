@@ -31,6 +31,7 @@ pub fn generate_schedule() -> Schedule {
     action_stage.add_system(navigation::sys_tick_navigation);
     action_stage.add_system(jump::sys_process_jump_inputs);
     action_stage.add_system(docking_undocking::sys_process_dock);
+    action_stage.add_system(inventory_mgmt::sys_manage_inventory_transfers_space_to_space);
 
     // entities receive updates messages and apply them to themselves
     let mut consequence_stage = SystemStage::parallel();
@@ -47,6 +48,7 @@ pub fn generate_schedule() -> Schedule {
     network_out_stage.add_system(network_msg_generator::sys_dispatch_other_ships);
     network_out_stage.add_system(network_msg_generator::sys_dispatch_own_ship);
     network_out_stage.add_system(network_msg_generator::sys_dispatch_ev_dock_undock);
+    network_out_stage.add_system(network_msg_generator::sys_dispatch_inv_updates);
 
     // all the bookkeeping for jumps, docks, and undocks is handled here
     let mut update_stage = SystemStage::parallel();

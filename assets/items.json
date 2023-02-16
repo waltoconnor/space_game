@@ -1,0 +1,9 @@
+{
+    "items": {
+        "test_item": {
+            "tags": ["TradeGood", "Component"],
+            "mapping": "None",
+            "size": 5
+        }
+    }
+}

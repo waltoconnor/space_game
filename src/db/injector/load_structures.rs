@@ -1,11 +1,9 @@
 use std::collections::HashMap;
-
-use bevy_ecs::prelude::*;
 use nalgebra::{Vector3, UnitQuaternion};
 
 use crate::{galaxy::{bundles::{structures::{BStation, BGate}, celestials::BPlanet}, components::*}, shared::ObjPath};
 
-use super::{structure_structs::{LStation, LStationList}, galaxy_structs::{LPlanet, LGalaxy, LChildBody}, orbit::{Orbit, orbit_to_csv}};
+use super::{structure_structs::{LStationList}, galaxy_structs::{LPlanet, LGalaxy, LChildBody}, orbit::{Orbit, orbit_to_csv}};
 
 const AU: f64 = 1.4959e11;
 

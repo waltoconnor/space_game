@@ -4,10 +4,12 @@ use serde::{Serialize, Deserialize};
 
 use crate::galaxy::components::Ship;
 
+pub type HangerSlot = u32;
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct PlayerHanger {
-    pub inventory: HashMap<u32, Ship>,
-    pub active: Option<Ship>
+    pub inventory: HashMap<HangerSlot, Ship>,
+    pub active: Option<u32>
 }
 
 impl PlayerHanger {
@@ -15,11 +17,11 @@ impl PlayerHanger {
         PlayerHanger { inventory: HashMap::new(), active: None }
     }
 
-    fn slot_free(&self, slot: u32) -> bool {
+    fn slot_free(&self, slot: HangerSlot) -> bool {
         !self.inventory.contains_key(&slot)
     }
 
-    fn get_open_slot(&self) -> Option<u32> {
+    fn get_open_slot(&self) -> Option<HangerSlot> {
         for i in 0..self.inventory.len() + 1 {
             if !self.inventory.contains_key(&(i as u32)) {
                 return Some(i as u32);
@@ -28,16 +30,18 @@ impl PlayerHanger {
         return None;
     }
 
-    pub fn insert_ship(&mut self, ship: Ship) {
+    /// returns slot it was inserted in to
+    pub fn insert_ship(&mut self, ship: Ship) -> u32 {
         let open_slot = self.get_open_slot().expect("COULD NOT FIND OPEN INVENTORY SLOT");
         self.inventory.insert(open_slot, ship);
+        open_slot
     }
 
-    pub fn remove_ship(&mut self, slot: u32) -> Option<Ship> {
+    pub fn remove_ship(&mut self, slot: HangerSlot) -> Option<Ship> {
         self.inventory.remove(&slot).and_then(|ship| Some(ship))
     }
 
-    fn get_last_ship_slot(&self) -> Option<u32> {
+    fn get_last_ship_slot(&self) -> Option<HangerSlot> {
         if self.inventory.len() == 0 {
             return None;
         }
@@ -47,39 +51,21 @@ impl PlayerHanger {
     }
 
     pub fn set_active_from_slot(&mut self, slot: u32) {
-        if self.slot_free(slot) {
-            eprintln!("Trying to activate ship from empty slot");
-            return;
-        }
-
-        if self.active.is_none() {
-            self.active = self.remove_ship(slot);    
-        }
-        else {
-            let mut tmp = None;
-            std::mem::swap(&mut tmp, &mut self.active);
-            //tmp now has the formerly active ship
-            self.active = self.remove_ship(slot); //slot is now empty for sure
-            match tmp {
-                Some(s) => self.inventory.insert(slot, s),
-                None => None
-            };
+        if self.inventory.contains_key(&slot) {
+            self.active = Some(slot);
         }
     }
 
     pub fn set_active_from_dock(&mut self, ship: Ship) {
-        let old = std::mem::replace(&mut self.active, Some(ship));
-        match old {
-            Some(o) => self.insert_ship(o),
-            None => ()
-        }
+        let slot = self.insert_ship(ship);
+        self.active = Some(slot);
     }
 
     pub fn remove_active_ship_undock(&mut self) -> Option<Ship> {
-        std::mem::replace(&mut self.active, None)
+        self.active.and_then(|a| self.inventory.remove(&a))
     }
 
     pub fn is_empty(&self) -> bool {
-        self.active.is_none() && self.inventory.len() == 0
+        self.inventory.len() == 0
     }
 }

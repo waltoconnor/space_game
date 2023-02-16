@@ -1,7 +1,7 @@
 use bevy_ecs::{world::World, schedule::{Schedule, Stage}};
 use dashmap::DashMap;
 
-use crate::{db::database::DB, network::messages::{incoming::NetIncomingMessage, outgoing::NetOutgoingMessage}};
+use crate::{db::database::DB, network::messages::{incoming::NetIncomingMessage, outgoing::NetOutgoingMessage}, inventory::ItemTable};
 
 use self::{runner::{schedule::generate_schedule, init_resources::init_resources}, resources::{network_handler::NetworkHandler, delta_time::DeltaTime}};
 
@@ -18,7 +18,7 @@ pub struct Galaxy {
 }
 
 impl Galaxy {
-    pub fn new(mut world: World, db: DB) -> Self {
+    pub fn new(mut world: World, db: DB, item_table: ItemTable) -> Self {
         init_resources(&mut world, db);
 
         Galaxy {

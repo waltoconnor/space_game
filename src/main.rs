@@ -1,6 +1,6 @@
 use std::{thread::{JoinHandle, self}, time::{Duration, Instant}};
 
-use crate::{db::injector::{inject_statics}, galaxy::resources::{path_to_entity::PathToEntityMap, database_resource::DatabaseResource}, shared::ObjPath};
+use crate::{db::injector::{inject_statics, load_items}, inventory::ItemTable};
 
 mod config;
 mod db;
@@ -17,10 +17,11 @@ fn spawn_sleepy_thread(time_ms: u32) -> JoinHandle<()> {
 fn main() {
     println!("Hello, world!");
     let config = config::load_config("./assets/config.json".to_string());
+    let items: ItemTable = load_items(config.assets_path.clone());
     let world = inject_statics(config.assets_path.clone());
-    let db = db::database::DB::load(&config.db_path, 1024 * 1024 * 1024);
+    let db = db::database::DB::load(&config.db_path, 1024 * 1024 * 1024, items.clone());
     let server = network::server::start_network(format!("{}:{}", config.network.websocket_ip, config.network.websocket_port));
-    let mut gal = galaxy::Galaxy::new(world, db);
+    let mut gal = galaxy::Galaxy::new(world, db, items);
 
     let mut last_cycle_time: f32 = 0.1;
 

@@ -1,4 +1,4 @@
-use crate::{galaxy::{Galaxy, resources::{database_resource::DatabaseResource, path_to_entity::PathToEntityMap}, components::{Ship, Stats, Hanger, Station}}, network::{server::ServerHandle, self}, shared::{ObjPath, self}, config::Config, db};
+use crate::{galaxy::{Galaxy, resources::{database_resource::DatabaseResource, path_to_entity::PathToEntityMap}, components::{Ship, Stats, Hanger, Station}}, network::{server::ServerHandle, self}, shared::{ObjPath, self}, config::Config, db, inventory::Inventory};
 
 /// returns if login was successful
 pub fn handle_new_player(gal: &Galaxy, name: &String, token: &String, server: &ServerHandle, config: &Config) -> bool{
@@ -19,7 +19,8 @@ pub fn handle_new_player(gal: &Galaxy, name: &String, token: &String, server: &S
                     thrust_n: 100.0,
                     ang_vel_rads: 1.0,
                     mass_kg: 10.0,
-                }
+                },
+                inventory: Inventory::new(None, Some(10000))
             });
 
             let cur_hanger = db.hanger_get_ships(&name, sh.hanger_uid).expect("Could not get ships from new player hanger");
