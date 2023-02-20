@@ -2,7 +2,7 @@ use bevy_ecs::prelude::*;
 use nalgebra::Vector3;
 use crate::galaxy::bundles::ships::BPlayerShip;
 use crate::galaxy::components::*;
-use crate::galaxy::events::EEvent;
+use crate::galaxy::events::{EEvent, EInfo};
 use crate::galaxy::resources::{database_resource::DatabaseResource, network_handler::NetworkHandler, path_to_entity::PathToEntityMap};
 use crate::network::messages::incoming::NetIncomingMessage;
 use crate::network::messages::outgoing::NetOutgoingMessage;
@@ -11,11 +11,13 @@ use crate::shared::ObjectType;
 
 pub fn sys_dispatch_login_info(
     mut ships: Query<(&mut PlayerController, &Ship, &mut Transform, &mut Navigation, &GameObject, Entity)>,
+    hangers: Query<&Hanger>,
     ptm: Res<PathToEntityMap>,
     net: Res<NetworkHandler>,
     db: Res<DatabaseResource>,
     mut command: Commands,
-    mut eev: EventWriter<EEvent>
+    mut eev: EventWriter<EEvent>,
+    mut ein: EventWriter<EInfo>,
 ){
     for entry in net.view_incoming() {
         let player = entry.key();
@@ -54,8 +56,24 @@ pub fn sys_dispatch_login_info(
                         };
                         eev.send(EEvent::Undock(player.clone(), loc.clone()));
                     }
+                    else {
+                        if let Some(ent) = ptm.get(&loc) {
+                            if let Ok(hanger) = hangers.get(ent) {
+                                ein.send(EInfo::UpdateInventoryId(player.clone(), hanger.hanger_uid));
+                                ein.send(EInfo::UpdateInventoryHanger(player.clone(), hanger.hanger_uid));
+                            }
+                            else {
+                                eprintln!("During login, found login station but didnn't find hanger");
+                            }
+                        }
+                        else {
+                            eprintln!("During login, could not find hanger attatched to login station");
+                        }
+                        
+                    }
 
                     net.enqueue_outgoing(player, NetOutgoingMessage::Info(NetOutInfo::Location(loc)));
+                    
                     /* TODO: HANDLE SKILLS AND BANK ACCOUNT */
                 },
                 NetIncomingMessage::Disconnect => {

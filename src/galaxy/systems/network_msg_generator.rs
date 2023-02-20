@@ -58,6 +58,26 @@ pub fn sys_dispatch_other_ships(
 
         let visible = s.visible_objs.iter().filter_map(|obj| ptm.get(obj)); // just silently ignore broken stuff, TODO: DEAL WITH THIS
         for v in visible {
+            // println!("Sensor: {} can see {:?}", pc.player_name, ptm.get_path_from_entity(v));
+            let (os, opc, ogo, ot) = match ships.get(v) {
+                Err(_) => { eprintln!("Ship not found for sensor"); continue; },
+                Ok(s) => s
+            };
+
+            let other_ship = SPlayerShip_OTHER {
+                path: ogo.path.clone(),
+                ship_class: os.ship_class.clone(),
+                ship_name: os.ship_name.clone(),
+                transform: ot.clone(),
+                player_name: opc.player_name.clone()
+            };
+
+            net.enqueue_outgoing(&pc.player_name, NetOutgoingMessage::State(NetOutState::OtherShip(other_ship)));
+        }
+
+        let lockable = s.lockable_objs.iter().filter_map(|obj| ptm.get(obj)); // just silently ignore broken stuff, TODO: DEAL WITH THIS
+        for v in lockable {
+            // println!("Sensor: {} can see {:?}", pc.player_name, ptm.get_path_from_entity(v));
             let (os, opc, ogo, ot) = match ships.get(v) {
                 Err(_) => { eprintln!("Ship not found for sensor"); continue; },
                 Ok(s) => s
@@ -85,7 +105,7 @@ pub fn sys_dispatch_own_ship(
             LoginState::LoggedOut(_) => { return; },
             _ => ()
         };
-
+        println!("Rotation: {:?}", t.rot);
         let ship = SPlayerShip_OWN {
             path: go.path.clone(),
             ship_class: s.ship_class.clone(),
@@ -107,7 +127,7 @@ pub fn sys_dispatch_ev_dock_undock(
 ){
     for e in eev.iter() {
         match e {
-            EEvent::Dock(player, station) => net.enqueue_outgoing(player, NetOutgoingMessage::Event(NetOutEvent::Undock(station.clone()))),
+            EEvent::Dock(player, station) => net.enqueue_outgoing(player, NetOutgoingMessage::Event(NetOutEvent::Dock(station.clone()))),
             EEvent::Undock(player, ship) => net.enqueue_outgoing(player, NetOutgoingMessage::Event(NetOutEvent::Undock(ship.clone()))),
             _ => ()
         }

@@ -70,6 +70,8 @@ fn handle_dock(players: &Query<(&PlayerController, &Ship, &Transform)>, hangers:
     db.db.hanger_dock(player_name, hanger.hanger_uid, p_ship.clone());
     db.db.account_change_location(player_name, station.clone());
     eev.send(EEvent::Dock(player_name.clone(), station.clone()));
+    ein.send(EInfo::UpdateInventoryId(player_name.clone(), hanger.hanger_uid));
+    ein.send(EInfo::UpdateInventoryHanger(player_name.clone(), hanger.hanger_uid));
     commands.entity(docking_ent).despawn();
 }
 

@@ -1,8 +1,8 @@
 {
     "network": {
-        "websocket_ip": "127.0.0.1",
+        "websocket_ip": "10.0.0.20",
         "websocket_port": 4000,
-        "http_ip": "127.0.0.1",
+        "http_ip": "10.0.0.20",
         "http_port": 4001
     },
     "db_path": "./world",

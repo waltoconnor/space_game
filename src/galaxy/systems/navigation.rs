@@ -29,7 +29,13 @@ fn update_navigation_local(q: &mut Query<(&PlayerController, &mut Navigation, &S
     };
 
     //get components
-    let (pc, mut nav, ship) = q.get_mut(ship_ent).expect("Could not find ship entity");
+    let (pc, mut nav, ship) = match q.get_mut(ship_ent) {
+        Ok(x) => x,
+        Err(_) => {
+            eprintln!("Navigation ship not found in space: {}", player);
+            return;
+        }
+    };
 
     // validate player
     if pc.player_name != *player {
@@ -80,7 +86,13 @@ fn update_navigation_warp(q: &mut Query<(&PlayerController, &mut Navigation, &Sh
     };
 
     //get components
-    let (pc, mut nav, ship) = q.get_mut(ship_ent).expect("Could not find ship entity");
+    let (pc, mut nav, ship) = match q.get_mut(ship_ent) {
+        Ok(x) => x,
+        Err(_) => {
+            eprintln!("Navigation ship not found in space: {}", player);
+            return;
+        }
+    };
 
     // validate player
     if pc.player_name != *player {

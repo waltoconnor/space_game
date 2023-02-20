@@ -48,6 +48,8 @@ pub fn sys_get_visible(mut sensors: Query<(Entity, &mut Sensor, &Ship)>, signatu
                 Err(_) => ObjectVisibility::Static
             };
 
+            //println!("Ship {} is sensing {:?} ({:?})", ship.ship_name, object_path, vis_status);
+
             match vis_status {
                 ObjectVisibility::Lockable => sensor.lockable_objs.insert(object_path),
                 ObjectVisibility::Visible => sensor.visible_objs.insert(object_path),
