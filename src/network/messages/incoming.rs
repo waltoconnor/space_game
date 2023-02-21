@@ -1,5 +1,5 @@
 use serde::{Serialize, Deserialize};
-use crate::{shared::ObjPath, inventory::{InvSlot, InvId}, db::HangerSlot};
+use crate::{shared::ObjPath, inventory::{InvSlot, InvId, ItemId}, db::HangerSlot};
 
 // player will be known due to map location
 
@@ -26,4 +26,13 @@ pub enum NetIncomingMessage {
     InvHangerShipToHangerShip(HangerSlot, InvSlot, u32, HangerSlot, InvSlot), //source hanger slot, source slot, count, dest hanger slot, dst slot
     InvStationToShip(InvId, InvSlot, u32, HangerSlot, InvSlot), //source inv, source slot, count, dst ship, dst slot
     InvStationToStation(InvId, InvSlot, u32, InvId, InvSlot), //source inv, source slot, count, dst inv, dst slot
+
+    /* Market */
+    PlaceBuyOrder(ItemId, InvId, u32, i64), //item, location, count, price PER ITEM
+    FulfillBuyOrder(ItemId, u64, InvId, InvSlot, u32), //item, order id, inventory id, inventory slot, count
+    CancelBuyOrder(ItemId, u64), //item, order id
+    PlaceSellOrder(InvId, InvSlot, u32, i64), //inventory, slot, count, cost per
+    FulfillSellOrder(ItemId, u64, u32), //item, order id, count
+    CancelSellOrder(ItemId, u64), //item, order id
+    GetStore(ItemId), // item id
 }

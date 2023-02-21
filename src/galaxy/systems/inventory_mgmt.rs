@@ -7,7 +7,7 @@ use crate::network::messages::incoming::NetIncomingMessage;
 
 const INTERACTION_DISTANCE_METERS: f64 = 1000.0;
 
-pub fn sys_manage_inventory_transfers_space_to_space(mut ships: Query<(&mut Ship, &PlayerController, &Transform)>, mut containers: Query<(&mut Container, &Transform)>, hangers: Query<&Hanger>, net: Res<NetworkHandler>, ptm: Res<PathToEntityMap>, db: Res<DatabaseResource>, mut ein: EventWriter<EInfo>) {
+pub fn sys_manage_inventory_transfers(mut ships: Query<(&mut Ship, &PlayerController, &Transform)>, mut containers: Query<(&mut Container, &Transform)>, hangers: Query<&Hanger>, net: Res<NetworkHandler>, ptm: Res<PathToEntityMap>, db: Res<DatabaseResource>, mut ein: EventWriter<EInfo>) {
     for slot in net.view_incoming() {
         let player = slot.key();
         let msgs = slot.value();

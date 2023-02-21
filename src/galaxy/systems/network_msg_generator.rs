@@ -135,7 +135,7 @@ pub fn sys_dispatch_ev_dock_undock(
 }
 
 
-pub fn sys_dispatch_inv_updates(
+pub fn sys_dispatch_inv_bank_updates(
     mut inf: EventReader<EInfo>,
     net: Res<NetworkHandler>,
     db: Res<DatabaseResource>
@@ -154,6 +154,15 @@ pub fn sys_dispatch_inv_updates(
                     net.enqueue_outgoing(player, NetOutgoingMessage::Info(NetOutInfo::Inventory(i, *inv_id)));
                 }
             },
+            EInfo::UpdateBankAccount(player) => {
+                let val = db.db.bank_get_value(player).expect("Could not get player bank value");
+                net.enqueue_outgoing(player, NetOutgoingMessage::Info(NetOutInfo::Bank(val)));
+            },
+            EInfo::ItemStore(player, item_id) => {
+                if let Some(store) = db.db.market_load_item_store(item_id.clone()) {
+                    net.enqueue_outgoing(player, NetOutgoingMessage::Info(NetOutInfo::Store(store)));
+                }
+            }
             _ => ()
         }
     }

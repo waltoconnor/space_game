@@ -16,6 +16,7 @@ tungstenite = "0.18"
 sled = { version = "0.34.7", features = [ "compression" ] }
 rand = "0.8"
 rouille = "3.6.1"
+chrono = "0.4.23"
 
 
 [profile.dev]

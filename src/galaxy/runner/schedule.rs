@@ -21,6 +21,7 @@ pub fn generate_schedule() -> Schedule {
     network_stage.add_system(navigation::sys_process_navigation_inputs_local);
     network_stage.add_system(navigation::sys_process_navigation_inputs_warp);
     network_stage.add_system(sense::sys_get_visible); // not sure if it makes sense to do this here
+    network_stage.add_system(market::sys_process_market); // want this to process before inventory motion later
 
     // entities examining other entities find them and collect the info they want (before it gets mutated)
     let mut find_stage = SystemStage::parallel();
@@ -31,7 +32,7 @@ pub fn generate_schedule() -> Schedule {
     action_stage.add_system(navigation::sys_tick_navigation);
     action_stage.add_system(jump::sys_process_jump_inputs);
     action_stage.add_system(docking_undocking::sys_process_dock);
-    action_stage.add_system(inventory_mgmt::sys_manage_inventory_transfers_space_to_space);
+    action_stage.add_system(inventory_mgmt::sys_manage_inventory_transfers);
 
     // entities receive updates messages and apply them to themselves
     let mut consequence_stage = SystemStage::parallel();
@@ -48,7 +49,7 @@ pub fn generate_schedule() -> Schedule {
     network_out_stage.add_system(network_msg_generator::sys_dispatch_other_ships);
     network_out_stage.add_system(network_msg_generator::sys_dispatch_own_ship);
     network_out_stage.add_system(network_msg_generator::sys_dispatch_ev_dock_undock);
-    network_out_stage.add_system(network_msg_generator::sys_dispatch_inv_updates);
+    network_out_stage.add_system(network_msg_generator::sys_dispatch_inv_bank_updates);
 
     // all the bookkeeping for jumps, docks, and undocks is handled here
     let mut update_stage = SystemStage::parallel();

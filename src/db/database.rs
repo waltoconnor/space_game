@@ -4,8 +4,8 @@ use std::fmt::Debug;
 use serde::{Serialize, Deserialize};
 use sled::{Tree, Db, IVec};
 
-use crate::{shared::ObjPath, galaxy::{components::{Ship, GameObject, Navigation, Transform}, bundles::ships::BPlayerShip}, inventory::{ItemTable, Inventory, Stack, InvSlot}};
-use super::{db_consts::*, db_structs::{account::*, hanger::PlayerHanger, ship_in_space::ShipInSpace}, HangerSlot};
+use crate::{shared::ObjPath, galaxy::{components::{Ship, GameObject, Navigation, Transform}, bundles::ships::BPlayerShip}, inventory::{ItemTable, Inventory, Stack, InvSlot, ItemId}};
+use super::{db_consts::*, db_structs::{account::*, hanger::PlayerHanger, ship_in_space::ShipInSpace, bank::BankAccount, market::{self, ItemStore}}, HangerSlot};
 use rmp_serde::{to_vec, from_slice};
 
 pub struct DB {
@@ -121,6 +121,59 @@ impl DB {
     }
 
     /* BANK */
+    fn bank_cook_account_key(&self, name: &String) -> String {
+        format!("{}:{}", BANK_ACCOUNT_PREFIX, name)
+    }
+
+    fn bank_cook_value_key(&self, name: &String) -> String {
+        format!("{}:{}", BANK_VALUE_PREFIX, name)
+    }
+
+    pub fn bank_new_account(&self, name: &String) {
+        let acct_key = self.bank_cook_account_key(name);
+        let val_key = self.bank_cook_value_key(name);
+        let acct = BankAccount::new(name);
+        let val: i64 = 0;
+        self.bank.insert(acct_key.as_bytes(), self.ser(&acct)).expect("Could not write new account to bank tree");
+        self.bank.insert(val_key.as_bytes(), self.ser(&val)).expect("Could not write new account val to bank tree");
+    }
+
+    pub fn bank_apply_transaction(&self, name: &String, value: i64, reason: String) -> Option<i64> {
+        let acct_key = self.bank_cook_account_key(name);
+        let val_key = self.bank_cook_value_key(name);
+        match (self.bank.get(acct_key.as_bytes()).expect("Could not read bank tree"), self.bank.get(val_key.as_bytes()).expect("Could not read bank tree")) {
+            (Some(acct), Some(val)) => {
+                let mut bank_acct: BankAccount = self.deser(&acct);
+                let mut bank_val: i64 = self.deser(&val);
+
+                if (value > 0 && i64::MAX - value >= bank_val) || bank_val + value >= 0 {
+                    bank_val += value;
+                    bank_acct.apply_transaction(value, reason);
+                    self.bank.insert(acct_key.as_bytes(), self.ser(&bank_acct)).expect("Could not write bank account");
+                    self.bank.insert(val_key.as_bytes(), self.ser(&bank_val)).expect("Could not write bank value");
+                    Some(value)
+                }
+                else {
+                    None
+                }
+            },
+            (_, _) => {
+                eprintln!("COULD NOT FIND BANK ACCOUNT FOR {}", name);
+                None
+            }
+        }
+    }
+
+    pub fn bank_get_value(&self, name: &String) -> Option<i64> {
+        let val_key = self.bank_cook_value_key(name);
+        self.bank.get(val_key.as_bytes()).expect("Could not read bank tree").and_then(|v| Some(self.deser(&v)))
+    }
+
+    pub fn bank_get_account_hist(&self, name: &String) -> Option<BankAccount> {
+        let acct_key = self.bank_cook_account_key(name);
+        self.bank.get(acct_key.as_bytes()).expect("Could not read bank tree").and_then(|v| Some(self.deser(&v)))
+    }
+
 
     /* HANGER */
     fn hanger_cook_key(&self, name: &String, hanger_id: u64) -> String {
@@ -334,7 +387,40 @@ impl DB {
         self.inventory.get(key).expect("Could not read inventory db").and_then(|i| self.deser(&i))
     }
 
+    /// WILL IGNORE CAPACITY REQUIREMENTS, DO NOT ALLOW PLAYERS TO INVOKE
+    pub fn inventory_insert_stack_free_slot_ignore_capacity(&self, name: &String, inventory_id: u64, stack: Stack) {
+        self.inventory_ensure(name, inventory_id);
+        self.inventory_run_fn(name, inventory_id, |inv|{
+            let mut inv = inv.expect("Could not unpack ensured inventory"); // we just ensured it exists
+            let slot = inv.insert_stack(stack);
+            (Some(inv), ())
+        });
+    }
+
     /* MARKET */
+    fn market_cook_index_key(&self, name: &String) -> String {
+        format!("{}:{}", MARKET_PLAYER_LIST, name)
+    }
+
+    fn market_cook_store_key(&self, item_id: ItemId) -> String {
+        format!("{}:{:?}", MARKET_ITEM, item_id)
+    }
+
+    pub fn market_add_player_index(&self, name: &String) {
+        let key = self.market_cook_index_key(name);
+        let player_index = market::PlayerOutstanding::new(name.clone());
+        self.market.insert(key.as_bytes(), self.ser(&player_index)).expect("Could not write to market tree");
+    }
+
+    pub fn market_load_item_store(&self, item_id: ItemId) -> Option<ItemStore> {
+        let key = self.market_cook_store_key(item_id.clone());
+        self.market.get(key.as_bytes()).expect("Could not read item store from tree").and_then(|is| Some(self.deser(&is)))
+    }
+
+    pub fn market_save_item_store(&self, store: &ItemStore) {
+        let key = self.market_cook_store_key(store.item.clone());
+        self.market.insert(key.as_bytes(), self.ser(store)).expect("Could not write item store to tree");
+    }
 
     /* SKILLS */
 

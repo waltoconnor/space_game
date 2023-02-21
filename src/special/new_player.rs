@@ -11,6 +11,8 @@ pub fn handle_new_player(gal: &Galaxy, name: &String, token: &String, server: &S
             let starter_station = gal.world.get_resource::<PathToEntityMap>().expect("Could not get path to entity map for new player").get(&starter_station_path).expect("Starter station not found in world");
             let sh = gal.world.get::<Hanger>(starter_station).expect("Could not get starter hanger component"); 
             db.account_create(&name, &token, starter_station_path);
+            db.bank_new_account(&name);
+            db.market_add_player_index(&name);
             db.hanger_add_ship(&name, sh.hanger_uid, Ship { 
                 ship_name: String::from("New ship"),
                 ship_class: String::from("Test Ship"),

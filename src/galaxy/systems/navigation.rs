@@ -1,9 +1,9 @@
-use std::{f64::consts::PI, sync::Mutex};
+use std::{f64::consts::PI};
 
 use bevy_ecs::prelude::*;
 use nalgebra::{Vector3, UnitQuaternion};
 
-use crate::{galaxy::{components::*, resources::{network_handler::NetworkHandler, path_to_entity::PathToEntityMap, delta_time::DeltaTime}, events::{EInfo, EEvent}}, network::messages::incoming::NetIncomingMessage, shared::{ObjPath, ObjectType}};
+use crate::{galaxy::{components::*, resources::{network_handler::NetworkHandler, path_to_entity::PathToEntityMap, delta_time::DeltaTime}, events::{EInfo}}, network::messages::incoming::NetIncomingMessage, shared::{ObjPath, ObjectType}};
 
 /// PROCESS NON WARP NAVIGATION MESSAGES
 /// Stage: COMMAND
@@ -29,7 +29,7 @@ fn update_navigation_local(q: &mut Query<(&PlayerController, &mut Navigation, &S
     };
 
     //get components
-    let (pc, mut nav, ship) = match q.get_mut(ship_ent) {
+    let (pc, mut nav, _ship) = match q.get_mut(ship_ent) {
         Ok(x) => x,
         Err(_) => {
             eprintln!("Navigation ship not found in space: {}", player);
@@ -86,7 +86,7 @@ fn update_navigation_warp(q: &mut Query<(&PlayerController, &mut Navigation, &Sh
     };
 
     //get components
-    let (pc, mut nav, ship) = match q.get_mut(ship_ent) {
+    let (pc, mut nav, _ship) = match q.get_mut(ship_ent) {
         Ok(x) => x,
         Err(_) => {
             eprintln!("Navigation ship not found in space: {}", player);
@@ -125,7 +125,7 @@ fn update_navigation_warp(q: &mut Query<(&PlayerController, &mut Navigation, &Sh
         Ok(w) => NavTarget::Point(w.warp_point),
         Err(_) => {
             match transforms.get(target_ent) {
-                Ok(t) => NavTarget::Obj(dst.clone()),
+                Ok(_t) => NavTarget::Obj(dst.clone()),
                 Err(_) => {
                     ein.send(EInfo::Error(player.clone(), String::from("That is not a valid warp target")));
                     //eprintln!("Invalid warp target");
@@ -184,7 +184,7 @@ fn is_static(t: ObjectType) -> bool {
 /// TICKS NAVIGATION FOR ALL THINGS, NOT JUST PLAYERS
 /// Stage: ACTION
 // TODO: make this respect visibility rules
-pub fn sys_tick_navigation(mut q: Query<(&mut Navigation, &Ship, &mut Transform)>, ptm: Res<PathToEntityMap>, dt: Res<DeltaTime>) {
+pub fn sys_tick_navigation(mut q: Query<(&mut Navigation, &Ship, &mut Transform)>, _ptm: Res<PathToEntityMap>, dt: Res<DeltaTime>) {
     q.par_for_each_mut(32, |(mut nav, ship, mut ship_transform)| {
         //println!("nav tick");
         let vel = nav.cur_target_vel;
@@ -261,7 +261,7 @@ fn handle_warp_to(nav: &mut Navigation, ship: &Ship, transform: &mut Transform, 
     }
 }
 
-fn handle_align_to(nav: &mut Navigation, ship: &Ship, transform: &mut Transform, target_pos: Vector3<f64>, dt: f64) {
+fn handle_align_to(_nav: &mut Navigation, ship: &Ship, transform: &mut Transform, target_pos: Vector3<f64>, dt: f64) {
     //println!("Aligning t={:?}", transform);
     let diff = target_pos - transform.pos;
     align_to_vector(transform, ship, diff, dt)

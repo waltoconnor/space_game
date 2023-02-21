@@ -69,7 +69,7 @@ impl Inventory {
     }
 
     /// THE STACK MUST BE ABLE TO FIT
-    fn insert_stack(&mut self, stack: Stack) {
+    pub fn insert_stack(&mut self, stack: Stack) {
         for (k, v) in self.inv.iter_mut() {
             if v.id == stack.id {
                 let result = v.add(stack);
@@ -123,8 +123,8 @@ impl Inventory {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Stack {
-    id: ItemId,
-    count: u32,
+    pub id: ItemId,
+    pub count: u32,
 }
 
 impl Stack {
