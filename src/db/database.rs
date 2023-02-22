@@ -5,7 +5,7 @@ use serde::{Serialize, Deserialize};
 use sled::{Tree, Db, IVec};
 
 use crate::{shared::ObjPath, galaxy::{components::{Ship, GameObject, Navigation, Transform}, bundles::ships::BPlayerShip}, inventory::{ItemTable, Inventory, Stack, InvSlot, ItemId}};
-use super::{db_consts::*, db_structs::{account::*, hanger::PlayerHanger, ship_in_space::ShipInSpace, bank::BankAccount, market::{self, ItemStore}}, HangerSlot};
+use super::{db_consts::*, db_structs::{account::*, hanger::PlayerHanger, ship_in_space::ShipInSpace, bank::BankAccount, market::{self, ItemStore}}, HangerSlot, PlayerOutstanding};
 use rmp_serde::{to_vec, from_slice};
 
 pub struct DB {
@@ -423,6 +423,71 @@ impl DB {
     pub fn market_save_item_store(&self, store: &ItemStore) {
         let key = self.market_cook_store_key(store.item.clone());
         self.market.insert(key.as_bytes(), self.ser(store)).expect("Could not write item store to tree");
+    }
+
+    pub fn market_add_buy_order_to_player(&self, name: &String, item_id: &ItemId, order_id: u64) {
+        let key = self.market_cook_index_key(name);
+        match self.market.get(key.as_bytes()).expect("Could not read player index from market tree").and_then(|idx| Some(self.deser::<PlayerOutstanding>(&idx))) {
+            Some(mut data) => {
+                data.add_buy_order(order_id, item_id.clone());
+                self.market.insert(key.as_bytes(), self.ser(&data)).expect("Could not write to market player index");
+            },
+            None => {
+                eprintln!("Unable to update player outstanding orders");
+            }
+        }
+    }
+
+    pub fn market_add_sell_order_to_player(&self, name: &String, item_id: &ItemId, order_id: u64) {
+        let key = self.market_cook_index_key(name);
+        match self.market.get(key.as_bytes()).expect("Could not read player index from market tree").and_then(|idx| Some(self.deser::<PlayerOutstanding>(&idx))) {
+            Some(mut data) => {
+                data.add_sell_order(order_id, item_id.clone());
+                self.market.insert(key.as_bytes(), self.ser(&data)).expect("Could not write to market player index");
+            },
+            None => {
+                eprintln!("Unable to update player outstanding orders");
+            }
+        }
+    }
+
+    pub fn market_remove_buy_order_from_player(&self, name: &String, order_id: u64) {
+        let key = self.market_cook_index_key(name);
+        match self.market.get(key.as_bytes()).expect("Could not read player index from market tree").and_then(|idx| Some(self.deser::<PlayerOutstanding>(&idx))) {
+            Some(mut data) => {
+                data.clear_buy_order(order_id);
+                self.market.insert(key.as_bytes(), self.ser(&data)).expect("Could not write to market player index");
+            },
+            None => {
+                eprintln!("Unable to update player outstanding orders");
+            }
+        }
+    }
+
+    pub fn market_remove_sell_order_from_player(&self, name: &String, order_id: u64) {
+        let key = self.market_cook_index_key(name);
+        match self.market.get(key.as_bytes()).expect("Could not read player index from market tree").and_then(|idx| Some(self.deser::<PlayerOutstanding>(&idx))) {
+            Some(mut data) => {
+                data.clear_sell_order(order_id);
+                self.market.insert(key.as_bytes(), self.ser(&data)).expect("Could not write to market player index");
+            },
+            None => {
+                eprintln!("Unable to update player outstanding orders");
+            }
+        }
+    }
+
+    pub fn market_can_place_new_order(&self, name: &String) -> bool {
+        let key = self.market_cook_index_key(name);
+        match self.market.get(key.as_bytes()).expect("Could not read player index from market tree").and_then(|idx| Some(self.deser::<PlayerOutstanding>(&idx))) {
+            Some(data) => {
+                data.can_place_order()
+            },
+            None => {
+                eprintln!("Unable to update player outstanding orders");
+                false
+            }
+        }
     }
 
     fn market_inject_items(&self, items: &ItemTable) {

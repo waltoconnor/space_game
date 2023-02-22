@@ -116,22 +116,24 @@ impl ItemStore {
         ItemStore { item: item_id, sell_orders: HashMap::new(), buy_orders: HashMap::new() }
     }
 
-    pub fn add_sell_order(&mut self, player: &String, stack: Stack, cost_per_item: i64, location: InvId) -> Result<(), String> {
+    pub fn add_sell_order(&mut self, player: &String, stack: Stack, cost_per_item: i64, location: InvId) -> Result<u64, String> {
         let order = SellOrder::new(stack, cost_per_item, player.clone(), location);
+        let id = order.order_id;
         if self.sell_orders.contains_key(&order.order_id) {
             return Err(String::from("An order with that ID already exists (hash collision)"));
         }
         self.sell_orders.insert(order.order_id, order);
-        Ok(())
+        Ok(id)
     }
 
-    pub fn add_buy_order(&mut self, player: &String, item_id: ItemId, count: u32, cost_per_item: i64, location: InvId) -> Result<(), String> {
+    pub fn add_buy_order(&mut self, player: &String, item_id: ItemId, count: u32, cost_per_item: i64, location: InvId) -> Result<u64, String> {
         let order = BuyOrder::new(item_id, count, player.clone(), count as i64 * cost_per_item, location);
+        let id = order.order_id;
         if self.buy_orders.contains_key(&order.order_id) {
             return Err(String::from("An order with that ID already exists (hash collision)"));
         }
         self.buy_orders.insert(order.order_id, order);
-        Ok(())
+        Ok(id)
     }
 
     pub fn fulfill_buy_order(&mut self, order_id: u64, stack: Stack, location: InvId, selling_player: String) -> Result<StoreTransaction, String> {
