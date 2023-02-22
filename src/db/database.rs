@@ -48,7 +48,7 @@ impl DB {
             .compression_factor(16);
         let db = config.open().expect("Could not open sled database");
 
-        DB { 
+        let db = DB { 
             account: db.open_tree(ACCOUNT_TREE).expect("Could not open account tree"), 
             bank: db.open_tree(BANK_TREE).expect("Could not open bank tree"),
             hanger: db.open_tree(HANGER_TREE).expect("Could not open hanger tree"), 
@@ -61,8 +61,11 @@ impl DB {
             statistics: db.open_tree(STATISTICS_TREE).expect("Could not open statistics tree"), 
             overlord: db.open_tree(OVERLORD_TREE).expect("Could not open inventory tree"),
             db: db,
-            item_table
-        }
+            item_table: item_table.clone()
+        };
+
+        db.market_inject_items(&item_table);
+        db
     }
 
     fn ser<T: Serialize + Debug>(&self, data: &T) -> IVec {
@@ -420,6 +423,14 @@ impl DB {
     pub fn market_save_item_store(&self, store: &ItemStore) {
         let key = self.market_cook_store_key(store.item.clone());
         self.market.insert(key.as_bytes(), self.ser(store)).expect("Could not write item store to tree");
+    }
+
+    fn market_inject_items(&self, items: &ItemTable) {
+        for item in items.keys() {
+            let key = self.market_cook_store_key(item.clone());
+            let store = ItemStore::new(item.clone());
+            self.market.insert(key.as_bytes(), self.ser(&store)).expect("Could not insert new item store during init");
+        }
     }
 
     /* SKILLS */

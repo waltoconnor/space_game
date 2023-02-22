@@ -1,5 +1,5 @@
 use std::collections::VecDeque;
-use chrono::{DateTime, Utc, NaiveDateTime};
+use chrono::Utc;
 use serde::{Serialize, Deserialize};
 
 const TRANACTION_COUNT: usize = 500;
@@ -22,18 +22,6 @@ impl BankAccount {
             self.history.pop_back();
         }
     }
-
-    // pub fn can_apply_transaction(&mut self, val: i64) -> bool {
-    //     if val > 0 && i64::MAX - val > self.cur_val {
-    //         eprintln!("Account is at max value");
-    //         return false;
-    //     }
-    //     else {
-    //         self.cur_val + val >= 0
-    //     }
-
-    // }
-
 }
 
 #[derive(Debug, Deserialize, Serialize)]
