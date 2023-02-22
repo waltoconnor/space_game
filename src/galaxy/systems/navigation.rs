@@ -360,6 +360,10 @@ fn align_to_vector(transform: &mut Transform, ship: &Ship, v: Vector3<f64>, dt: 
     let slerp_amount = ((ship.stats.ang_vel_rads * dt) / angle_to).min(1.0);
     //println!("slerp: {}", slerp_amount);
     transform.rot = transform.rot.slerp(&rot_to_target, slerp_amount);
+    if transform.rot.i.is_nan() {
+        println!("ROT IS NAN: slerp_amount: {}, angle_to: {}, rot_to_target: {:?}", slerp_amount, angle_to, rot_to_target);
+        transform.rot = rot_to_target; //just force it through
+    }
 }
 
 fn is_aligned(transform: &Transform, v: Vector3<f64>, epsilon_rad: f64) -> bool {
@@ -378,13 +382,8 @@ fn is_aligned(transform: &Transform, v: Vector3<f64>, epsilon_rad: f64) -> bool 
 /// THIS UPDATES POSITIONS
 /// Stage: CONSEQUENCE
 pub fn sys_tick_transforms(mut t: Query<&mut Transform>, dt: Res<DeltaTime>) {
-    // for mut transform in t.iter_mut() {
-    //     let vel = transform.vel;
-    //     transform.pos += vel * dt.dt;
-    // }
     t.par_for_each_mut(500, |mut transform| {
         let vel = transform.vel;
         transform.pos += vel * dt.dt
     });
 }
-
