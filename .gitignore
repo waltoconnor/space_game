@@ -1,2 +1,4 @@
 /target
-/world
+target
+world
+world/*

@@ -105,7 +105,7 @@ pub fn sys_dispatch_own_ship(
             LoginState::LoggedOut(_) => { return; },
             _ => ()
         };
-        println!("Rotation: {:?}", t.rot);
+        //println!("Rotation: {:?}", t.rot);
         let ship = SPlayerShip_OWN {
             path: go.path.clone(),
             ship_class: s.ship_class.clone(),

@@ -290,13 +290,17 @@ fn handle_approach(nav: &mut Navigation, ship: &Ship, transform: &mut Transform,
     //println!("Approaching t={:?}", transform);
     let tvel = match target_vel { Some(v) => v, None => Vector3::zeros() };
     let rel_vel = tvel - transform.vel;
-
-
+    let dist = target_pos.metric_distance(&transform.pos);
     let dir_to_target = (target_pos - transform.pos).normalize();
+
+    if dist < 10.0 && rel_vel.magnitude() < 1.0 { //if we are at the target and within 1 m/s, just call it close enough
+        transform.vel = tvel;
+        return;
+    }
+
     let closing_rate = rel_vel.dot(&dir_to_target);
     let bad_vel = rel_vel - (dir_to_target * closing_rate); // undesierable velocity component
-    let dist = target_pos.metric_distance(&transform.pos);
-
+    
     let max_accel = ship.stats.thrust_n / ship.stats.mass_kg;
     let time_to_decelerate = closing_rate / max_accel;
     let dist_to_decelerate = 0.5 * max_accel * time_to_decelerate * time_to_decelerate; // 1/2 * a * t^2
