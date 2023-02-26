@@ -49,7 +49,7 @@ fn update_navigation_local(q: &mut Query<(&PlayerController, &mut Navigation, &S
         return;
     }
 
-    if nav.warp_state == WarpState::Warping {
+    if let WarpState::Warping(_) = nav.warp_state {
         ein.send(EInfo::Error(player.clone(), String::from("You cannot issue navigation commands while warping")));
         //eprintln!("TODO: alert player that they can't issue nav commands while warping");
         return;
@@ -106,7 +106,7 @@ fn update_navigation_warp(q: &mut Query<(&PlayerController, &mut Navigation, &Sh
         return;
     }
 
-    if nav.warp_state == WarpState::Warping {
+    if let WarpState::Warping(_) = nav.warp_state {
         ein.send(EInfo::Error(player.clone(), String::from("You cannot issue navigation commands while warping")));
         //eprintln!("TODO: alert player that they can't issue nav commands while warping");
         return;
@@ -230,32 +230,51 @@ fn handle_warp_to(nav: &mut Navigation, ship: &Ship, transform: &mut Transform, 
             let rot_to_target = UnitQuaternion::face_towards(&diff, &up);
             if transform.rot.angle_to(&rot_to_target) < 5.0 * (2.0 * PI) / 360.0 {
                 println!("Warping");
-                nav.warp_state = WarpState::Warping;
+                nav.warp_state = WarpState::Warping(0.0);
             }
         },
-        WarpState::Warping => {
+        WarpState::Warping(n) => {
+            // SPOOL UP
+            if n < 1.0 {
+                let new_n = n + (dt as f32) / ship.stats.warp_spool_s;
+                if new_n >= 1.0 {
+                    nav.warp_state = WarpState::Warping(1.0);
+                }
+                else {
+                    nav.warp_state = WarpState::Warping(new_n);
+                }
+                return;
+            }
+
             transform.vel = Vector3::zeros();
             let dist_to_object = transform.pos.metric_distance(&target_pos);
-            
+
             // we want to warp to a point n meters away from the object
             let real_target_point = transform.pos.lerp(&target_pos, 1.0 - (target_dist / dist_to_object));
             let real_dist = transform.pos.metric_distance(&real_target_point);
+
             
-
-            if real_dist < 1.0 { //1 meter
-                nav.reset();
-            }
-
-            let lerp_amount = ((ship.stats.warp_speed_ms * dt) / real_dist).min(1.0);
-            if lerp_amount > 0.99 {
-                transform.pos = real_target_point;
-                nav.reset();
+            
+            if real_dist > 11000000.0 { //11,000 KM (we try to hit 10K KM, and if we undershoot we still activate the deceleration)
+                let warp_target_point = transform.pos.lerp(&real_target_point, 1.0 - (10000000.0 / dist_to_object));
+                let warp_target_dist = transform.pos.metric_distance(&warp_target_point);
+                let lerp_amount = ((ship.stats.warp_speed_ms * dt) / warp_target_dist).min(1.0);
+                if lerp_amount > 0.99 {
+                    transform.pos = warp_target_point;
+                }
+                else {
+                    transform.pos = transform.pos.lerp(&real_target_point, lerp_amount);
+                }
             }
             else {
+                let lerp_amount = 0.1 * (dt / 0.1); //cover 0.1 of the distance to the target each 10th second once we are within 10,000KM
                 transform.pos = transform.pos.lerp(&real_target_point, lerp_amount);
-            }
+                if real_dist < 10.0 { //1 meter
+                    nav.reset();
+                }
+            };
 
-            println!("Dist from actual and target: {}, real_dist: {}, lerp: {}", target_pos.metric_distance(&real_target_point), real_dist, lerp_amount);
+            //println!("Dist from actual and target: {}, real_dist: {}, lerp: {}", target_pos.metric_distance(&real_target_point), real_dist, lerp_amount);
             
         }
     }
@@ -356,6 +375,10 @@ fn align_to_vector(transform: &mut Transform, ship: &Ship, v: Vector3<f64>, dt: 
     };
 
     let rot_to_target = UnitQuaternion::face_towards(&v, &up);
+    if rot_to_target.i.is_nan() || rot_to_target.j.is_nan() || rot_to_target.k.is_nan() || rot_to_target.w.is_nan() {
+        return; // THIS HAPPENS IF THE ROTATION IS ZERO
+    }
+
     let angle_to = transform.rot.angle_to(&rot_to_target);
     let slerp_amount = ((ship.stats.ang_vel_rads * dt) / angle_to).min(1.0);
     //println!("slerp: {}", slerp_amount);

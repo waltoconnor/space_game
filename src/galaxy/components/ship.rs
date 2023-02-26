@@ -18,5 +18,6 @@ pub struct Stats {
     pub warp_speed_ms: f64,
     pub thrust_n: f64,
     pub ang_vel_rads: f64,
-    pub mass_kg: f64
+    pub mass_kg: f64,
+    pub warp_spool_s: f32
 }

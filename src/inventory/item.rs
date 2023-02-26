@@ -22,6 +22,7 @@ pub enum Mapping {
     Ship(String), //ship class
     Ammo(String), //ammo class
     Structure(String), //structure class
+    Blueprint(String), //blueprint id
     None,
 }
 
@@ -31,4 +32,5 @@ pub struct Item {
     pub tags: HashSet<ItemTag>,
     pub mapping: Mapping,
     pub size_vunits: u32, //1 vunit = 0.01m3 
+    pub tech_level: u8,
 }

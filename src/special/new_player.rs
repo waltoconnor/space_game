@@ -21,6 +21,7 @@ pub fn handle_new_player(gal: &Galaxy, name: &String, token: &String, server: &S
                     thrust_n: 100.0,
                     ang_vel_rads: 1.0,
                     mass_kg: 10.0,
+                    warp_spool_s: 5.0
                 },
                 inventory: Inventory::new(None, Some(10000))
             });

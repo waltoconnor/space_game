@@ -14,10 +14,10 @@ pub enum Action {
     None
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum WarpState {
     Aligning,
-    Warping,
+    Warping(f32),
     NotWarping
 }
 

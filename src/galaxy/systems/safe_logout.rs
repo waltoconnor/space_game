@@ -111,7 +111,7 @@ pub fn sys_dispatch_login_info(
             LoginState::SafeLogged => { return; }
         };
 
-        if nav.warp_state == WarpState::Warping {
+        if let WarpState::Warping(_) = nav.warp_state {
             return; //wait for warp to finish
         }
 
