@@ -18,7 +18,7 @@ impl BStation {
     pub fn new(system: &String, name: &String, transform: Transform, warp_point: Vector3<f64>, undock_offset: Vector3<f64>, docking_range: f64) -> Self {
         let mut hasher = DefaultHasher::new();
         name.hash(&mut hasher);
-        let hash = hasher.finish();
+        let hash = format!("{:x}", hasher.finish());
         BStation { 
             game_object: GameObject { path: ObjPath::new(system, ObjectType::Station, name) }, 
             hanger: Hanger { undock_offset: undock_offset, hanger_uid: hash, docking_range_m: docking_range }, 

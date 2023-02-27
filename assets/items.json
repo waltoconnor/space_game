@@ -1,10 +1,43 @@
 {
     "test_item": {
+        "name": "Testname",
         "tags": ["TradeGood", "Component"],
         "mapping": "None",
         "size": 5,
         "tech_level": 0,
         "texture": "Resources/Ore_1.png"
+    },
+    "haxonite": {
+        "name": "Haxonite",
+        "tags": ["Ore"],
+        "mapping": "None",
+        "size": 1,
+        "tech_level": 1,
+        "texture": "Resources/Ore_1.png"
+    },
+    "hapkeite": {
+        "name": "Hapkeite",
+        "tags": ["Ore"],
+        "mapping": "None",
+        "size": 1,
+        "tech_level": 0,
+        "texture": "Resources/Ore_2.png"
+    },
+    "wolframite": {
+        "name": "Wolframite",
+        "tags": ["Ore"],
+        "mapping": "None",
+        "size": 1,
+        "tech_level": 2,
+        "texture": "Resources/Ore_3.png"
+    },
+    "cohenite": {
+        "name": "Cohenite",
+        "tags": ["Ore"],
+        "mapping": "None",
+        "size": 1,
+        "tech_level": 3,
+        "texture": "Resources/Ore_4.png"
     }
     
 }

@@ -5,7 +5,7 @@ use serde::{Serialize, Deserialize};
 use super::{ItemTable, ItemId};
 
 pub type InvSlot = u32;
-pub type InvId = u64;
+pub type InvId = String;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Inventory {
@@ -19,6 +19,9 @@ impl Inventory {
         Inventory { id: id, inv: HashMap::new(), capacity_vunits: capacity }
     }
 
+    ///will attempt to insert the stack, if there is not enough space, this will insert as many items as possible and then return the remainder as leftovers.
+    ///if the destination slot is occupied, this will bump the contents of the destination slot to somewhere else IN THE SAME INVENTORY.
+    ///NOTE: THIS WILL ONLY RETURN ITEMS IF THERE WAS NOT ENOUGH SPACE, IT WILL NEVER RETURN A DIFFERENT TYPE OF ITEM THAN THE INPUT TYPE.
     pub fn add_stack(&mut self, item_table: &ItemTable, mut stack: Stack, slot: Option<InvSlot>) -> Option<Stack> {
         match self.capacity_vunits {
             Some(cap) => {
@@ -40,7 +43,7 @@ impl Inventory {
                         }
                     },
                     (Some(is), Some(slot)) => {
-                        self.insert_stack_at_slot(is, slot);
+                        self.insert_stack_at_slot(is, slot, true);
                         if stack.count == 0 {
                             return None;
                         }
@@ -53,7 +56,7 @@ impl Inventory {
             None => { 
                 match slot {
                     None => { self.insert_stack(stack); None },
-                    Some(slot) => { self.insert_stack_at_slot(stack, slot); None }
+                    Some(slot) => { self.insert_stack_at_slot(stack, slot, true); None }
                 }
             }
         }
@@ -65,7 +68,9 @@ impl Inventory {
     }
 
     pub fn remove_n_from_stack(&mut self, slot: InvSlot, count: u32) -> Option<Stack> {
-        self.inv.get_mut(&slot).and_then(|s| s.take_n(count))
+        let (ret, empty) = self.inv.get_mut(&slot).and_then(|s| Some((s.take_n(count), s.is_empty())))?;
+        if empty { self.inv.remove(&slot); }
+        ret
     }
 
     /// THE STACK MUST BE ABLE TO FIT
@@ -73,8 +78,10 @@ impl Inventory {
         for (k, v) in self.inv.iter_mut() {
             if v.id == stack.id {
                 let result = v.add(stack);
-                if result.is_some() {
-                    eprintln!("Failed to stack items, annihilating {:?}", result);
+                if let Some(stack) = result{
+                    let slot = self.get_first_free_slot();
+                    self.insert_stack_at_slot(stack, slot, true);
+                    //eprintln!("Failed to stack items, annihilating {:?}", result);
                 }
                 return;
             }
@@ -85,14 +92,38 @@ impl Inventory {
     }
 
     /// THE STACK MUST BE ABLE TO FIT
-    fn insert_stack_at_slot(&mut self, stack: Stack, slot: InvSlot) {
+    fn insert_stack_at_slot(&mut self, stack: Stack, slot: InvSlot, first_try: bool) {
+        if !self.inv.contains_key(&slot) {
+            if let Some(old) = self.inv.insert(slot, stack.clone()){
+                eprintln!("SUPPOSEDLY EMPTY STACK ACTUALLY HAD DATA");
+                let slot = self.get_first_free_slot();
+                self.insert_stack_at_slot(old, slot, false);
+                return;
+            }
+            else {
+                return;
+            }
+        }
+
         if let Some(v) = self.inv.get_mut(&slot) {
             if v.id == stack.id {
                 let result = v.add(stack);
-                if result.is_some() {
-                    eprintln!("Failed to stack items, annihilating {:?}", result);
+                if let Some(stack) = result {
+                    if !first_try {
+                        eprintln!("Failed to stack items, 'get_first_open_slot' returned occupied slot, annihilating {:?}", stack);
+                        return;
+                    }
+                    let slot = self.get_first_free_slot();
+                    self.insert_stack_at_slot(stack, slot, false);
+                    
                 }
                 return;
+            }
+            else { //stacks dont match
+                let old = v.clone();
+                *v = stack;
+                let slot = self.get_first_free_slot();
+                self.insert_stack_at_slot(old, slot, false);
             }
         }
         else {

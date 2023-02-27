@@ -59,8 +59,8 @@ pub fn sys_dispatch_login_info(
                     else {
                         if let Some(ent) = ptm.get(&loc) {
                             if let Ok(hanger) = hangers.get(ent) {
-                                ein.send(EInfo::UpdateInventoryId(player.clone(), hanger.hanger_uid));
-                                ein.send(EInfo::UpdateInventoryHanger(player.clone(), hanger.hanger_uid));
+                                ein.send(EInfo::UpdateInventoryId(player.clone(), hanger.hanger_uid.clone()));
+                                ein.send(EInfo::UpdateInventoryHanger(player.clone(), hanger.hanger_uid.clone()));
                             }
                             else {
                                 eprintln!("During login, found login station but didnn't find hanger");

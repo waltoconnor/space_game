@@ -1,4 +1,4 @@
-use crate::{galaxy::{Galaxy, resources::{database_resource::DatabaseResource, path_to_entity::PathToEntityMap}, components::{Ship, Stats, Hanger, Station}}, network::{server::ServerHandle, self}, shared::{ObjPath, self}, config::Config, db, inventory::Inventory};
+use crate::{galaxy::{Galaxy, resources::{database_resource::DatabaseResource, path_to_entity::PathToEntityMap}, components::{Ship, Stats, Hanger, Station}}, network::{server::ServerHandle, self}, shared::{ObjPath, self}, config::Config, db, inventory::{Inventory, Stack}};
 
 /// returns if login was successful
 pub fn handle_new_player(gal: &Galaxy, name: &String, token: &String, server: &ServerHandle, config: &Config) -> bool{
@@ -13,7 +13,12 @@ pub fn handle_new_player(gal: &Galaxy, name: &String, token: &String, server: &S
             db.account_create(&name, &token, starter_station_path);
             db.bank_new_account(&name);
             db.market_add_player_index(&name);
-            db.hanger_add_ship(&name, sh.hanger_uid, Ship { 
+            db.inventory_ensure(&name, sh.hanger_uid.clone());
+            let mut ship_inv = Inventory::new(None, Some(10000));
+            ship_inv.insert_stack(Stack::new("haxonite".to_string(), 200));
+            ship_inv.insert_stack(Stack::new("hapkeite".to_string(), 200));
+            ship_inv.insert_stack(Stack::new("wolframite".to_string(), 200));
+            db.hanger_add_ship(&name, sh.hanger_uid.clone(), Ship { 
                 ship_name: String::from("New ship"),
                 ship_class: String::from("Test Ship"),
                 stats: Stats {
@@ -23,12 +28,12 @@ pub fn handle_new_player(gal: &Galaxy, name: &String, token: &String, server: &S
                     mass_kg: 10.0,
                     warp_spool_s: 5.0
                 },
-                inventory: Inventory::new(None, Some(10000))
+                inventory: ship_inv
             });
 
-            let cur_hanger = db.hanger_get_ships(&name, sh.hanger_uid).expect("Could not get ships from new player hanger");
+            let cur_hanger = db.hanger_get_ships(&name, sh.hanger_uid.clone()).expect("Could not get ships from new player hanger");
             let slot = cur_hanger.inventory.keys().last().expect("Could not get last key in hanger");
-            db.hanger_set_active_ship_slot(name, sh.hanger_uid, *slot);
+            db.hanger_set_active_ship_slot(name, sh.hanger_uid.clone(), *slot);
             // let cur_hanger = db.hanger_get_ships(&name, sh.hanger_uid).expect("Could not get ships from new player hanger");
             // println!("{:?}", cur_hanger);
             server.send_message_to_player(name.clone(), network::messages::outgoing::NetOutgoingMessage::LoginOk);

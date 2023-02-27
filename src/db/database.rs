@@ -4,7 +4,7 @@ use std::fmt::Debug;
 use serde::{Serialize, Deserialize};
 use sled::{Tree, Db, IVec};
 
-use crate::{shared::ObjPath, galaxy::{components::{Ship, GameObject, Navigation, Transform}, bundles::ships::BPlayerShip}, inventory::{ItemTable, Inventory, Stack, InvSlot, ItemId}};
+use crate::{shared::ObjPath, galaxy::{components::{Ship, GameObject, Navigation, Transform, HngId}, bundles::ships::BPlayerShip}, inventory::{ItemTable, Inventory, Stack, InvSlot, ItemId, InvId}};
 use super::{db_consts::*, db_structs::{account::*, hanger::PlayerHanger, ship_in_space::ShipInSpace, bank::BankAccount, market::{self, ItemStore}}, HangerSlot, PlayerOutstanding};
 use rmp_serde::{to_vec, from_slice};
 
@@ -179,11 +179,11 @@ impl DB {
 
 
     /* HANGER */
-    fn hanger_cook_key(&self, name: &String, hanger_id: u64) -> String {
+    fn hanger_cook_key(&self, name: &String, hanger_id: HngId) -> String {
         format!("{}:{}", name, hanger_id)
     }
 
-    pub fn hanger_ensure(&self, name: &String, hanger_id: u64) {
+    pub fn hanger_ensure(&self, name: &String, hanger_id: HngId) {
         let key = self.hanger_cook_key(name, hanger_id);
         if !self.hanger.contains_key(key.as_bytes()).expect("Could not read hanger tree") {
             let new_hanger = PlayerHanger::new();
@@ -191,7 +191,7 @@ impl DB {
         }
     }
 
-    pub fn hanger_set_active_ship_slot(&self, name: &String, hanger_id: u64, slot: u32) {
+    pub fn hanger_set_active_ship_slot(&self, name: &String, hanger_id: HngId, slot: u32) {
         let key = self.hanger_cook_key(name, hanger_id);
         match self.hanger.get(key.as_bytes()).expect("Could not read hanger tree") {
             Some(h) => {
@@ -206,12 +206,12 @@ impl DB {
     }
 
     /// RETURNS A COPY OF THE ACTUAL HANGER, CAN NOT MUTATE DIRECTLY
-    pub fn hanger_get_ships(&self, name: &String, hanger_id: u64) -> Option<PlayerHanger> { 
+    pub fn hanger_get_ships(&self, name: &String, hanger_id: HngId) -> Option<PlayerHanger> { 
         let key = self.hanger_cook_key(name, hanger_id);
         self.hanger.get(key.as_bytes()).expect("Could not read hanger tree").and_then(|x| Some(self.deser(&x)))
     }
 
-    pub fn hanger_undock(&self, name: &String, hanger_id: u64) -> Option<Ship> {
+    pub fn hanger_undock(&self, name: &String, hanger_id: HngId) -> Option<Ship> {
         let key = self.hanger_cook_key(name, hanger_id);
         match self.hanger.get(key.as_bytes()).expect("Could not read hanger tree") {
             Some(h) => {
@@ -227,8 +227,8 @@ impl DB {
         }
     }
 
-    pub fn hanger_dock(&self, name: &String, hanger_id: u64, ship: Ship) {
-        let key = self.hanger_cook_key(name, hanger_id);
+    pub fn hanger_dock(&self, name: &String, hanger_id: HngId, ship: Ship) {
+        let key = self.hanger_cook_key(name, hanger_id.clone());
         match self.hanger.get(key.as_bytes()).expect("Could not read hanger tree") {
             Some(h) => {
                 let mut h: PlayerHanger = self.deser(&h);
@@ -236,14 +236,14 @@ impl DB {
                 self.hanger.insert(key.as_bytes(), self.ser(&h)).expect("Could not push dock event to hanger tree");
             },
             None => {
-                self.hanger_ensure(name, hanger_id);
+                self.hanger_ensure(name, hanger_id.clone());
                 self.hanger_dock(name, hanger_id, ship); // if this keeps recursing, we have a big problem
             }
         }
     }
 
-    pub fn hanger_add_ship(&self, name: &String, hanger_id: u64, ship: Ship) {
-        let key = self.hanger_cook_key(name, hanger_id);
+    pub fn hanger_add_ship(&self, name: &String, hanger_id: HngId, ship: Ship) {
+        let key = self.hanger_cook_key(name, hanger_id.clone());
         match self.hanger.get(key.as_bytes()).expect("Could not read hanger tree") {
             Some(h) => {
                 let mut h: PlayerHanger = self.deser(&h);
@@ -251,13 +251,13 @@ impl DB {
                 self.hanger.insert(key.as_bytes(), self.ser(&h)).expect("Could not push ship add to tree");
             },
             None => {
-                self.hanger_ensure(name, hanger_id);
+                self.hanger_ensure(name, hanger_id.clone());
                 self.hanger_add_ship(name, hanger_id, ship); // if this keeps recursing, we have a big problem
             }
         }
     }
 
-    pub fn hanger_remove_ship(&self, name: &String, hanger_id: u64, slot: HangerSlot) -> Option<Ship> {
+    pub fn hanger_remove_ship(&self, name: &String, hanger_id: HngId, slot: HangerSlot) -> Option<Ship> {
         let key = self.hanger_cook_key(name, hanger_id);
         match self.hanger.get(key.as_bytes()).expect("Could not read hanger tree") {
             Some(h) => {
@@ -274,7 +274,7 @@ impl DB {
     }
 
     /// REMOVES THE HANGER FROM THE DB IF IT IS EMPTY
-    pub fn hanger_sweep(&self, name: &String, hanger_id: u64) {
+    pub fn hanger_sweep(&self, name: &String, hanger_id: HngId) {
         let key = self.hanger_cook_key(name, hanger_id);
         match self.hanger.get(key.as_bytes()).expect("Could not read hanger tree") {
             Some(h) => {
@@ -290,7 +290,7 @@ impl DB {
     }
 
     // returns anything that was taken
-    pub fn hanger_ship_take_items(&self, name: &String, hanger_id: u64, slot: HangerSlot, inv_slot: InvSlot, count: u32) -> Option<Stack> {
+    pub fn hanger_ship_take_items(&self, name: &String, hanger_id: HngId, slot: HangerSlot, inv_slot: InvSlot, count: u32) -> Option<Stack> {
         let key = self.hanger_cook_key(name, hanger_id);
         match self.hanger.get(key.as_bytes()).expect("Could not read hanger tree") {
             Some(h) => {
@@ -308,7 +308,7 @@ impl DB {
     }
 
     // returns anything that could not be transferred
-    pub fn hanger_ship_add_items(&self, name: &String, hanger_id: u64, slot: HangerSlot, inv_slot: Option<InvSlot>, stack: Stack) -> Option<Stack> {
+    pub fn hanger_ship_add_items(&self, name: &String, hanger_id: HngId, slot: HangerSlot, inv_slot: Option<InvSlot>, stack: Stack) -> Option<Stack> {
         let key = self.hanger_cook_key(name, hanger_id);
         match self.hanger.get(key.as_bytes()).expect("Could not read hanger tree") {
             Some(h) => {
@@ -326,19 +326,19 @@ impl DB {
     }
 
     /* INVENTORY */
-    fn inventory_cook_key(&self, name: &String, inventory_id: u64) -> String {
+    fn inventory_cook_key(&self, name: &String, inventory_id: InvId) -> String {
         format!("{}:{}", name, inventory_id)
     }
 
-    pub fn inventory_ensure(&self, name: &String, inventory_id: u64) {
-        let key = self.inventory_cook_key(name, inventory_id);
+    pub fn inventory_ensure(&self, name: &String, inventory_id: InvId) {
+        let key = self.inventory_cook_key(name, inventory_id.clone());
         if self.inventory.contains_key(key.as_bytes()).expect("Could not check for inventory key"){
             return;
         }
-        self.inventory.insert(key.as_bytes(), self.ser(&Inventory::new(Some(inventory_id), None))).expect("Could not ensure inventory");
+        self.inventory.insert(key.as_bytes(), self.ser(&Inventory::new(Some(inventory_id.clone()), None))).expect("Could not ensure inventory");
     }
 
-    fn inventory_run_fn<F, F1>(&self, name: &String, inventory_id: u64, func: F1) -> F 
+    fn inventory_run_fn<F, F1>(&self, name: &String, inventory_id: InvId, func: F1) -> F 
     where F1: FnOnce(Option<Inventory>) -> (Option<Inventory>, F) {
         let key = self.inventory_cook_key(name, inventory_id);
         let mut inv: Option<Inventory> = self.inventory.get(key.as_bytes()).expect("Could not read inventory from db").and_then(|inv| Some(self.deser(&inv)));
@@ -350,9 +350,9 @@ impl DB {
         result
     }
 
-    pub fn inventory_insert_stack(&self, name: &String, inventory_id: u64, stack: Stack, slot: Option<u32>) -> Option<Stack> {
-        self.inventory_ensure(name, inventory_id);
-        let res = self.inventory_run_fn(name, inventory_id, |inv|{
+    pub fn inventory_insert_stack(&self, name: &String, inventory_id: InvId, stack: Stack, slot: Option<u32>) -> Option<Stack> {
+        self.inventory_ensure(name, inventory_id.clone());
+        let res = self.inventory_run_fn(name, inventory_id.clone(), |inv|{
             match inv {
                 None => {
                     eprintln!("Inventory not found despite being freshly made");
@@ -367,8 +367,8 @@ impl DB {
         res
     }
 
-    pub fn inventory_remove_stack(&self, name: &String, inventory_id: u64, slot: u32, count: Option<u32>, ) -> Option<Stack> {
-        if !self.inventory.contains_key(&self.inventory_cook_key(name, inventory_id).as_bytes()).expect("Could not read key from db") { return None; }
+    pub fn inventory_remove_stack(&self, name: &String, inventory_id: InvId, slot: u32, count: Option<u32>, ) -> Option<Stack> {
+        if !self.inventory.contains_key(&self.inventory_cook_key(name, inventory_id.clone()).as_bytes()).expect("Could not read key from db") { return None; }
         let res = self.inventory_run_fn(name, inventory_id, |inv| {
             match inv {
                 None => (None, None),
@@ -385,14 +385,14 @@ impl DB {
     }
 
     /// CLONE, SO YOU CANT MUTATE IT
-    pub fn inventory_get_inv(&self, name: &String, inventory_id: u64) -> Option<Inventory> {
-        let key = self.inventory_cook_key(name, inventory_id);
+    pub fn inventory_get_inv(&self, name: &String, inventory_id: InvId) -> Option<Inventory> {
+        let key = self.inventory_cook_key(name, inventory_id.clone());
         self.inventory.get(key).expect("Could not read inventory db").and_then(|i| self.deser(&i))
     }
 
     /// WILL IGNORE CAPACITY REQUIREMENTS, DO NOT ALLOW PLAYERS TO INVOKE
-    pub fn inventory_insert_stack_free_slot_ignore_capacity(&self, name: &String, inventory_id: u64, stack: Stack) {
-        self.inventory_ensure(name, inventory_id);
+    pub fn inventory_insert_stack_free_slot_ignore_capacity(&self, name: &String, inventory_id: InvId, stack: Stack) {
+        self.inventory_ensure(name, inventory_id.clone());
         self.inventory_run_fn(name, inventory_id, |inv|{
             let mut inv = inv.expect("Could not unpack ensured inventory"); // we just ensured it exists
             let slot = inv.insert_stack(stack);

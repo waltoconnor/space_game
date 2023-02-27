@@ -67,11 +67,11 @@ fn handle_dock(players: &Query<(&PlayerController, &Ship, &Transform)>, hangers:
         return;
     }    
 
-    db.db.hanger_dock(player_name, hanger.hanger_uid, p_ship.clone());
+    db.db.hanger_dock(player_name, hanger.hanger_uid.clone(), p_ship.clone());
     db.db.account_change_location(player_name, station.clone());
     eev.send(EEvent::Dock(player_name.clone(), station.clone()));
-    ein.send(EInfo::UpdateInventoryId(player_name.clone(), hanger.hanger_uid));
-    ein.send(EInfo::UpdateInventoryHanger(player_name.clone(), hanger.hanger_uid));
+    ein.send(EInfo::UpdateInventoryId(player_name.clone(), hanger.hanger_uid.clone()));
+    ein.send(EInfo::UpdateInventoryHanger(player_name.clone(), hanger.hanger_uid.clone()));
     commands.entity(docking_ent).despawn();
 }
 
@@ -103,7 +103,7 @@ fn handle_undock(hangers: &Query<(&Hanger, &Transform)>, ptm: &Res<PathToEntityM
         }
     };
 
-    let ship = db.db.hanger_undock(player_name, hanger.hanger_uid);
+    let ship = db.db.hanger_undock(player_name, hanger.hanger_uid.clone());
 
     match ship {
         None => {

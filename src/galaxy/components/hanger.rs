@@ -3,13 +3,14 @@
 use bevy_ecs::prelude::*;
 use nalgebra::Vector3;
 
+pub type HngId = String;
 //use super::{ship::Ship, transform::Transform};
 
 #[derive(Component)]
 pub struct Hanger {
     //pub player_hangers: HashMap<String, PlayerHanger>,
     pub undock_offset: Vector3<f64>,
-    pub hanger_uid: u64,
+    pub hanger_uid: HngId,
     pub docking_range_m: f64,
 }
 

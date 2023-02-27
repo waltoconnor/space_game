@@ -38,8 +38,8 @@ pub fn sys_process_market(db: Res<DatabaseResource>, net: Res<NetworkHandler>, m
                         Some(o) => o,
                         None => { ein.send(EInfo::Error(player.clone(), String::from("Requested sell order no longer exists"))); continue; }
                     };
-                    let inv_id = order.location;
-                    ein.send(EInfo::UpdateInventoryId(player.clone(), order.location));
+                    let inv_id = order.location.clone();
+                    ein.send(EInfo::UpdateInventoryId(player.clone(), order.location.clone()));
                     let stack = store.cancel_sell_order(player, *order_id).expect("Could not cancel sell order that was just validated");
                     db.db.inventory_insert_stack_free_slot_ignore_capacity(player, inv_id, stack);
                     db.db.market_remove_sell_order_from_player(player, *order_id);
@@ -48,27 +48,27 @@ pub fn sys_process_market(db: Res<DatabaseResource>, net: Res<NetworkHandler>, m
                     // give money to selling player, take item from selling player, give item to buying player, remove money from buying escrow
                     ensure_item_store_in_cache(&db, &mut local_cache, item_id);
                     let store = local_cache.get_mut(item_id).unwrap();
-                    let stack = match db.db.inventory_remove_stack(player, *inv_id, *inv_slot, Some(*count)){
+                    let stack = match db.db.inventory_remove_stack(player, inv_id.clone(), *inv_slot, Some(*count)){
                         Some(s) => s,
                         None => { ein.send(EInfo::Error(player.clone(), String::from("Source inventory slot does not have items"))); continue; }
                     };
                     
-                    match store.fulfill_buy_order(*order_id, stack.clone(), *inv_id, player.clone()){
+                    match store.fulfill_buy_order(*order_id, stack.clone(), inv_id.clone(), player.clone()){
                         Ok(t) => {
                             db.db.bank_apply_transaction(player, t.cost, format!("Sold {}x{} to {}", t.purchased_stack.id, *count, t.purchasing_player)).expect("Could not apply bank transaction");
-                            db.db.inventory_insert_stack_free_slot_ignore_capacity(&t.purchasing_player, t.location, stack);
+                            db.db.inventory_insert_stack_free_slot_ignore_capacity(&t.purchasing_player, t.location.clone(), stack);
                             if t.order_complete {
                                 if let Some(_res) = store.clear_buy_order(*order_id){
                                     db.db.market_remove_buy_order_from_player(&t.purchasing_player, *order_id);
                                 }
                             }
                             ein.send(EInfo::UpdateBankAccount(player.clone()));
-                            ein.send(EInfo::UpdateInventoryId(player.clone(), *inv_id));
-                            ein.send(EInfo::UpdateInventoryId(t.purchasing_player.clone(), t.location));
+                            ein.send(EInfo::UpdateInventoryId(player.clone(), inv_id.clone()));
+                            ein.send(EInfo::UpdateInventoryId(t.purchasing_player.clone(), t.location.clone()));
 
                         },
                         Err(e) => { 
-                            db.db.inventory_insert_stack_free_slot_ignore_capacity(player, *inv_id, stack); //if there was a problem, return the stack
+                            db.db.inventory_insert_stack_free_slot_ignore_capacity(player, inv_id.clone(), stack); //if there was a problem, return the stack
                             ein.send(EInfo::Error(player.clone(), e)); 
                             continue; 
                         }
@@ -87,9 +87,9 @@ pub fn sys_process_market(db: Res<DatabaseResource>, net: Res<NetworkHandler>, m
                         ein.send(EInfo::Error(player.clone(), String::from("Insufficent funds"))); continue;
                     }
 
-                    match store.fulfill_sell_order(*order_id, *count, order.location, player.clone()) {
+                    match store.fulfill_sell_order(*order_id, *count, order.location.clone(), player.clone()) {
                         Ok(t) => {
-                            db.db.inventory_insert_stack_free_slot_ignore_capacity(&t.purchasing_player, t.location, t.purchased_stack);
+                            db.db.inventory_insert_stack_free_slot_ignore_capacity(&t.purchasing_player, t.location.clone(), t.purchased_stack);
                             db.db.bank_apply_transaction(&t.purchasing_player, -t.cost, format!("Purchased {}x{} from {}", item_id, *count, t.selling_player));
                             db.db.bank_apply_transaction(&t.selling_player, t.cost, format!("Sold {}x{} to {}", item_id, *count, t.purchasing_player));
                             if t.order_complete {
@@ -99,7 +99,7 @@ pub fn sys_process_market(db: Res<DatabaseResource>, net: Res<NetworkHandler>, m
                             }
                             ein.send(EInfo::UpdateBankAccount(t.purchasing_player.clone()));
                             ein.send(EInfo::UpdateBankAccount(t.selling_player.clone()));
-                            ein.send(EInfo::UpdateInventoryId(t.purchasing_player.clone(), t.location));
+                            ein.send(EInfo::UpdateInventoryId(t.purchasing_player.clone(), t.location.clone()));
                         },
                         Err(e) => {
                             ein.send(EInfo::Error(player.clone(), e));
@@ -121,7 +121,7 @@ pub fn sys_process_market(db: Res<DatabaseResource>, net: Res<NetworkHandler>, m
                         ein.send(EInfo::Error(player.clone(), String::from("Insufficent funds"))); continue;
                     }
 
-                    match store.add_buy_order(player, item_id.clone(), *count, *price_per_item, *location) {
+                    match store.add_buy_order(player, item_id.clone(), *count, *price_per_item, location.clone()) {
                         Ok(order_id) => {
                             db.db.market_add_buy_order_to_player(player, item_id, order_id);
                             db.db.bank_apply_transaction(player, -money, format!("Placed buy order for {}x{}", item_id, *count));
@@ -139,7 +139,7 @@ pub fn sys_process_market(db: Res<DatabaseResource>, net: Res<NetworkHandler>, m
                         continue;
                     }
 
-                    let item_stack = match db.db.inventory_remove_stack(player, *inventory_id, *item_slot, Some(*count)) {
+                    let item_stack = match db.db.inventory_remove_stack(player, inventory_id.clone(), *item_slot, Some(*count)) {
                         None => {
                             ein.send(EInfo::Error(player.clone(), String::from("Invalid item stack attempting to be sold (not enough items in stack?)")));
                             continue;
@@ -149,10 +149,10 @@ pub fn sys_process_market(db: Res<DatabaseResource>, net: Res<NetworkHandler>, m
                     ensure_item_store_in_cache(&db, &mut local_cache, &item_stack.id);
                     let id = item_stack.id.clone();
                     let store = local_cache.get_mut(&item_stack.id).unwrap();
-                    match store.add_sell_order(player, item_stack, *price_per_item, *inventory_id) {
+                    match store.add_sell_order(player, item_stack, *price_per_item, inventory_id.clone()) {
                         Ok(order_id) => {
                             db.db.market_add_sell_order_to_player(player, &id, order_id);
-                            ein.send(EInfo::UpdateInventoryId(player.clone(), *inventory_id));
+                            ein.send(EInfo::UpdateInventoryId(player.clone(), inventory_id.clone()));
                         },
                         Err(e) => {
                             ein.send(EInfo::Error(player.clone(), e));

@@ -41,6 +41,8 @@ fn space_to_space(ships: &mut Query<(&mut Ship, &PlayerController, &Transform)>,
             eprintln!("Need to transfer to or from ship");
             return;
         }
+
+        eprintln!("TODO: CHECK DISTANCE TO CONTAINER HERE");
         
         // get the position and stack from the source
         let res_stack = match src_path.t {
@@ -135,10 +137,10 @@ fn inv_ship_to_ship(hanger: &Query<&Hanger>, ptm: &Res<PathToEntityMap>, db: &Re
         let player_loc = match db.db.account_get_location(player) { Some(p) => p, None => { eprintln!("inv_hanger_to_ship: Player not in account table"); return; }};
         let ent = match ptm.get(&player_loc) { Some(e) => e, None => { eprintln!("inv_hanger_to_ship: Player path not found in ptm"); return; }};
         let h = match hanger.get(ent) { Ok(h) => h, Err(_) => { eprintln!("inv_hanger_to_ship: Hanger entity not found"); return; }};
-        let id = h.hanger_uid;
-        let stack = match db.db.hanger_ship_take_items(player, id, *src_h, *src_slot, *count) { Some(s) => s, None => { eprintln!("inv_hanger_to_ship: No item stack in souce ship"); return; }};
-        let extra =  db.db.hanger_ship_add_items(player, id, *dst_h, Some(*dst_slot), stack);
-        ein.send(EInfo::UpdateInventoryHanger(player.clone(), id));
+        let id = h.hanger_uid.clone();
+        let stack = match db.db.hanger_ship_take_items(player, id.clone(), *src_h, *src_slot, *count) { Some(s) => s, None => { eprintln!("inv_hanger_to_ship: No item stack in souce ship"); return; }};
+        let extra =  db.db.hanger_ship_add_items(player, id.clone(), *dst_h, Some(*dst_slot), stack);
+        ein.send(EInfo::UpdateInventoryHanger(player.clone(), id.clone()));
         let finish = match extra {
             Some(s) => db.db.hanger_ship_add_items(player, id, *src_h, Some(*src_slot), s),
             None => None,
@@ -158,11 +160,13 @@ fn inv_ship_to_inv(hanger: &Query<&Hanger>, ptm: &Res<PathToEntityMap>, db: &Res
         let player_loc = match db.db.account_get_location(player) { Some(p) => p, None => { eprintln!("inv_ship_to_inv: Player not in account table"); return; }};
         let ent = match ptm.get(&player_loc) { Some(e) => e, None => { eprintln!("inv_ship_to_inv: Player path not found in ptm"); return; }};
         let h = match hanger.get(ent) { Ok(h) => h, Err(_) => { eprintln!("inv_ship_to_inv: Hanger entity not found"); return; }};
-        let id = h.hanger_uid;
-        if id != *dst_inv { eprintln!("Mismatch between target inventory and found inventory for station (TODO: SUPPORT MULTIPLE INVENTORIES)"); return; }; 
-        let stack = match db.db.hanger_ship_take_items(player, id, *hanger_slot, *src_slot, *count) { Some(s) => s, None => { eprintln!("inv_ship_to_inv: No item stack in souce ship"); return; }};
-        let extra =  db.db.inventory_insert_stack(player, id, stack, Some(*dst_slot));
-        ein.send(EInfo::UpdateInventoryHanger(player.clone(), id));
+        let id = h.hanger_uid.clone();
+        if id != *dst_inv { eprintln!("Mismatch between target inventory and found inventory for station, got {}, expected {} (TODO: SUPPORT MULTIPLE INVENTORIES)", *dst_inv, id); return; }; 
+        let stack = match db.db.hanger_ship_take_items(player, id.clone(), *hanger_slot, *src_slot, *count) { Some(s) => s, None => { eprintln!("inv_ship_to_inv: No item stack in souce ship"); return; }};
+        let extra =  db.db.inventory_insert_stack(player, id.clone(), stack, Some(*dst_slot));
+        ein.send(EInfo::UpdateInventoryHanger(player.clone(), id.clone()));
+        ein.send(EInfo::UpdateInventoryId(player.clone(), dst_inv.clone()));
+
         let finish = match extra {
             Some(s) => db.db.hanger_ship_add_items(player, id, *hanger_slot, Some(*src_slot), s),
             None => None,
@@ -182,13 +186,14 @@ fn inv_inv_to_ship(hanger: &Query<&Hanger>, ptm: &Res<PathToEntityMap>, db: &Res
         let player_loc = match db.db.account_get_location(player) { Some(p) => p, None => { eprintln!("inv_inv_to_ship: Player not in account table"); return; }};
         let ent = match ptm.get(&player_loc) { Some(e) => e, None => { eprintln!("inv_inv_to_ship: Player path not found in ptm"); return; }};
         let h = match hanger.get(ent) { Ok(h) => h, Err(_) => { eprintln!("inv_inv_to_ship: Hanger entity not found"); return; }};
-        let id = h.hanger_uid;
+        let id = h.hanger_uid.clone();
         if id != *src_inv_id { eprintln!("inv_inv_to_ship Mismatch between target inventory and found inventory for station (TODO: SUPPORT MULTIPLE INVENTORIES)"); return; }; 
-        let stack = match db.db.inventory_remove_stack(player, id, *src_slot, Some(*count)) { Some(s) => s, None => { eprintln!("inv_inv_to_ship: No item stack in souce inv"); return; }};
-        let extra = db.db.hanger_ship_add_items(player, id, *hanger_slot, Some(*dst_slot), stack);
-        ein.send(EInfo::UpdateInventoryHanger(player.clone(), id));
+        let stack = match db.db.inventory_remove_stack(player, id.clone(), *src_slot, Some(*count)) { Some(s) => s, None => { eprintln!("inv_inv_to_ship: No item stack in souce inv"); return; }};
+        let extra = db.db.hanger_ship_add_items(player, id.clone(), *hanger_slot, Some(*dst_slot), stack);
+        ein.send(EInfo::UpdateInventoryId(player.clone(), src_inv_id.clone()));
+        ein.send(EInfo::UpdateInventoryHanger(player.clone(), id.clone()));
         let finish = match extra {
-            Some(s) => db.db.inventory_insert_stack(player, *src_inv_id, s, Some(*src_slot)),
+            Some(s) => db.db.inventory_insert_stack(player, src_inv_id.clone(), s, Some(*src_slot)),
             None => None,
         };
         match finish {
@@ -206,13 +211,13 @@ fn inv_to_inv(hanger: &Query<&Hanger>, ptm: &Res<PathToEntityMap>, db: &Res<Data
         let player_loc = match db.db.account_get_location(player) { Some(p) => p, None => { eprintln!("inv_to_inv: Player not in account table"); return; }};
         let ent = match ptm.get(&player_loc) { Some(e) => e, None => { eprintln!("inv_to_inv: Player path not found in ptm"); return; }};
         let h = match hanger.get(ent) { Ok(h) => h, Err(_) => { eprintln!("inv_to_inv: Hanger entity not found"); return; }};
-        let id = h.hanger_uid;
+        let id = h.hanger_uid.clone();
         if id != *src_id || id != *dst_id { eprintln!("inv_to_inv Mismatch between target inventory and found inventory for station (TODO: SUPPORT MULTIPLE INVENTORIES)"); return; }; 
-        let stack = match db.db.inventory_remove_stack(player, *src_id, *src_slot, Some(*count)) { Some(s) => s, None => { eprintln!("inv_to_inv: No item stack in souce inv"); return; }};
-        let extra = db.db.inventory_insert_stack(player, *dst_id, stack, Some(*dst_slot));
-        ein.send(EInfo::UpdateInventoryHanger(player.clone(), id));
+        let stack = match db.db.inventory_remove_stack(player, src_id.clone(), *src_slot, Some(*count)) { Some(s) => s, None => { eprintln!("inv_to_inv: No item stack in souce inv"); return; }};
+        let extra = db.db.inventory_insert_stack(player, dst_id.clone(), stack, Some(*dst_slot));
+        ein.send(EInfo::UpdateInventoryId(player.clone(), id));
         let finish = match extra {
-            Some(s) => db.db.inventory_insert_stack(player, *src_id, s, Some(*src_slot)),
+            Some(s) => db.db.inventory_insert_stack(player, src_id.clone(), s, Some(*src_slot)),
             None => None,
         };
         match finish {
