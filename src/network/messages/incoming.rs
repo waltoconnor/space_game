@@ -20,6 +20,9 @@ pub enum NetIncomingMessage {
     /* Jumping */
     Jump(ObjPath, ObjPath), //ship, gate
 
+    /* Hanger */
+    SetActiveShip(HangerSlot), // hanger slot
+
     /* Inventory */
     InvSpaceToSpace(ObjPath, InvSlot, u32, ObjPath, InvSlot), //source object, source slot, source count, dst_container, dst_slot
     InvHangerShipToStation(HangerSlot, InvSlot, u32, InvId, InvSlot), //hanger slot, src_slot, count, dst_ivn, dst_slot

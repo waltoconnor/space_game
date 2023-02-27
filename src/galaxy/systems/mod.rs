@@ -9,3 +9,4 @@ pub mod network_msg_generator;
 pub mod safe_logout;
 pub mod inventory_mgmt;
 pub mod market;
+pub mod hanger_mgmt;

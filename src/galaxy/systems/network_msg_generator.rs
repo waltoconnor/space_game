@@ -1,5 +1,5 @@
 use bevy_ecs::prelude::*;
-use crate::{galaxy::{resources::{path_to_entity::PathToEntityMap, network_handler::NetworkHandler, star_system_table::SystemMapTable, database_resource::DatabaseResource}, events::{EEvent, EInfo}, bundles::ships::BPlayerShip}, network::{serialization_structs::{state::{SSystem, SPlayerShip_OTHER, NetOutState, SPlayerShip_OWN}, event::NetOutEvent, info::{NetOutInfo, hanger::SHanger}}, messages::{outgoing::NetOutgoingMessage, incoming::NetIncomingMessage}}, shared::ObjectType, inventory::Inventory};
+use crate::{galaxy::{resources::{path_to_entity::PathToEntityMap, network_handler::NetworkHandler, star_system_table::SystemMapTable, database_resource::DatabaseResource}, events::{EEvent, EInfo}}, network::{serialization_structs::{state::{SSystem, SPlayerShip_OTHER, NetOutState, SPlayerShip_OWN}, event::NetOutEvent, info::{NetOutInfo, hanger::SHanger}}, messages::{outgoing::NetOutgoingMessage}}, inventory::Inventory};
 
 use super::super::components::*;
 

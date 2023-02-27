@@ -22,6 +22,7 @@ pub fn generate_schedule() -> Schedule {
     network_stage.add_system(navigation::sys_process_navigation_inputs_warp);
     network_stage.add_system(sense::sys_get_visible); // not sure if it makes sense to do this here
     network_stage.add_system(market::sys_process_market); // want this to process before inventory motion later
+    network_stage.add_system(hanger_mgmt::hanger_mgmt); // this can process at the same time as the market, but not at the same time as inventory management
 
     // entities examining other entities find them and collect the info they want (before it gets mutated)
     let mut find_stage = SystemStage::parallel();

@@ -1,5 +1,5 @@
 use bevy_ecs::prelude::*;
-use nalgebra::{UnitQuaternion, Vector3};
+use nalgebra::{Vector3};
 use rand::Rng;
 use crate::{galaxy::{components::*, resources::{network_handler::NetworkHandler, path_to_entity::PathToEntityMap, database_resource::DatabaseResource}, events::{EInfo, EEvent}}, network::messages::incoming::NetIncomingMessage, shared::ObjPath};
 
@@ -56,7 +56,7 @@ pub fn sys_process_jump_inputs(mut players: Query<(&PlayerController, &mut Trans
                         }
                     };
 
-                    let (dst_gate, dst_gate_transform, dst_go) = gates.get(dst_gate_ent).expect("Could not get dst gate");
+                    let (_dst_gate, dst_gate_transform, dst_go) = gates.get(dst_gate_ent).expect("Could not get dst gate");
                     nav.reset();
                     pc_transform.vel = Vector3::zeros();
                     pc_transform.pos = dst_gate_transform.pos + (Vector3::<f64>::new(rng.gen::<f64>() - 0.5, rng.gen::<f64>() - 0.5, rng.gen::<f64>() - 0.5).normalize() * 1000.0);

@@ -18,7 +18,7 @@ pub struct Galaxy {
 }
 
 impl Galaxy {
-    pub fn new(mut world: World, db: DB, item_table: ItemTable) -> Self {
+    pub fn new(mut world: World, db: DB, _item_table: ItemTable) -> Self {
         init_resources(&mut world, db);
 
         Galaxy {

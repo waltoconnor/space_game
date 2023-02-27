@@ -1,6 +1,6 @@
 use bevy_ecs::prelude::*;
 
-use crate::{galaxy::{components::*, resources::{network_handler::NetworkHandler, path_to_entity::PathToEntityMap, database_resource::DatabaseResource}, bundles::ships::BPlayerShip, events::{EEvent, EInfo}}, network::messages::incoming::NetIncomingMessage, shared::ObjPath, db::database::DB};
+use crate::{galaxy::{components::*, resources::{network_handler::NetworkHandler, path_to_entity::PathToEntityMap, database_resource::DatabaseResource}, bundles::ships::BPlayerShip, events::{EEvent, EInfo}}, network::messages::incoming::NetIncomingMessage, shared::ObjPath};
 
 pub fn sys_process_dock(players: Query<(&PlayerController, &Ship, &Transform)>, hangers: Query<(&Hanger, &Transform)>, mut commands: Commands, n: Res<NetworkHandler>, ptm: Res<PathToEntityMap>, db: Res<DatabaseResource>, mut eev: EventWriter<EEvent>, mut ein: EventWriter<EInfo>) {
     for player in n.view_incoming() {
