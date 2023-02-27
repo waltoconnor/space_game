@@ -12,6 +12,8 @@ pub mod events;
 mod runner;
 mod systems;
 
+pub mod galaxy_map;
+
 pub struct Galaxy {
     pub world: World,
     schedule: Schedule
@@ -23,7 +25,7 @@ impl Galaxy {
 
         Galaxy {
             world,
-            schedule: generate_schedule()
+            schedule: generate_schedule(),
         }
     }
 

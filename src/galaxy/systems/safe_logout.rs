@@ -3,6 +3,7 @@ use nalgebra::Vector3;
 use crate::galaxy::bundles::ships::BPlayerShip;
 use crate::galaxy::components::*;
 use crate::galaxy::events::{EEvent, EInfo};
+use crate::galaxy::resources::galaxy_map::GalaxyMapRes;
 use crate::galaxy::resources::{database_resource::DatabaseResource, network_handler::NetworkHandler, path_to_entity::PathToEntityMap};
 use crate::network::messages::incoming::NetIncomingMessage;
 use crate::network::messages::outgoing::NetOutgoingMessage;
@@ -15,6 +16,7 @@ pub fn sys_dispatch_login_info(
     ptm: Res<PathToEntityMap>,
     net: Res<NetworkHandler>,
     db: Res<DatabaseResource>,
+    gmap: Res<GalaxyMapRes>,
     mut command: Commands,
     mut eev: EventWriter<EEvent>,
     mut ein: EventWriter<EInfo>,
@@ -72,6 +74,7 @@ pub fn sys_dispatch_login_info(
                         
                     }
 
+                    net.enqueue_outgoing(player, NetOutgoingMessage::Info(NetOutInfo::GalaxyMap(gmap.gmap.clone())));
                     net.enqueue_outgoing(player, NetOutgoingMessage::Info(NetOutInfo::Location(loc)));
                     
                     /* TODO: HANDLE SKILLS AND BANK ACCOUNT */

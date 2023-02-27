@@ -19,4 +19,5 @@ pub fn init_resources<'a>(world: &mut World, db: DB) {
     world.init_resource::<Events<EEvent>>();
     world.init_resource::<Events<EInfo>>();
     world.init_resource::<Events<EState>>();
+    //GALAXY MAP RESOURCE handled in injector since it needs to read the raw galaxy file
 }

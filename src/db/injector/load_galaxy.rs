@@ -2,7 +2,7 @@ use std::{collections::HashMap, f64::consts::PI};
 
 use nalgebra::{Vector3, UnitQuaternion, UnitVector3};
 
-use crate::galaxy::bundles::celestials::{BSun, BPlanet, BMoon, BAsteroidBelt};
+use crate::galaxy::{bundles::celestials::{BSun, BPlanet, BMoon, BAsteroidBelt}, galaxy_map::{GalaxyMap, GMLink, GMSystem}};
 
 use super::{galaxy_structs::LGalaxy, orbit::{Orbit, compute_soi}, orbit::orbit_to_csv};
 
@@ -164,4 +164,24 @@ pub fn load_system_positions(gal: &LGalaxy) -> HashMap<String, Vector3<f64>> {
         }
     }
     spm
+}
+
+pub fn load_galaxy_map(gal: &LGalaxy) -> GalaxyMap {
+    let mut links = vec![];
+    let mut systems = vec![];
+    for r in gal.regions.iter() {
+        for (name, sys) in r.systems.iter() {
+            let pos = Vector3::new(sys.pos.x, sys.pos.y, sys.pos.z);
+            let region = r.name.clone();
+            let name = name.clone();
+            let sun_temp = sys.sys.star.temp;
+            systems.push(GMSystem { name, region, sun_temp, pos: pos })
+        }
+
+        for con in r.connections.iter() {
+            links.push(GMLink { start: con.a.clone(), end: con.b.clone() });
+        }
+    }
+
+    GalaxyMap { systems, links }
 }

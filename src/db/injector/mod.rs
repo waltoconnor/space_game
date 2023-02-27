@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use bevy_ecs::world::World;
 
-use crate::inventory::{ItemTable, ItemId};
+use crate::{inventory::{ItemTable, ItemId}, galaxy::resources::galaxy_map::GalaxyMapRes};
 
 use self::{galaxy_structs::LGalaxy, structure_structs::LStationList, load_items::LItem};
 
@@ -23,6 +23,9 @@ pub fn inject_statics(path_to_assets: String) -> World {
     let gal: LGalaxy = serde_json::from_str(gal_file.as_str()).expect("Could not deserialize gal file");
 
     let system_positions = load_galaxy::load_system_positions(&gal);
+
+    let gmap = load_galaxy::load_galaxy_map(&gal);
+    world.insert_resource(GalaxyMapRes { gmap }); //TODO: This is not with the rest of the resources, but since this is not modified I am ok with it
 
     let suns = load_galaxy::load_stars(&gal);
     let planets = load_galaxy::load_planets(&gal, &suns);
