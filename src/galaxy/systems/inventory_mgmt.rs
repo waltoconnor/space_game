@@ -41,24 +41,22 @@ fn space_to_space(ships: &mut Query<(&mut Ship, &PlayerController, &Transform)>,
             eprintln!("Need to transfer to or from ship");
             return;
         }
-
-        eprintln!("TODO: CHECK DISTANCE TO CONTAINER HERE");
         
         // get the position and stack from the source
         let res_stack = match src_path.t {
-            crate::shared::ObjectType::Container | crate::shared::ObjectType::Wreck => containers.get_mut(src_ent).and_then(|(mut i, t)| Ok((t.pos, i.inv.remove_n_from_stack(*src_slot, *count)))),
+            crate::shared::ObjectType::Container | crate::shared::ObjectType::Wreck => containers.get_mut(src_ent).and_then(|(mut i, t)| Ok((t.pos, i.inv.remove_n_from_stack(*src_slot, *count), i.access_dist))),
             crate::shared::ObjectType::PlayerShip => ships.get_mut(src_ent).and_then(|(mut s, pc, t)| {
                 if pc.player_name != *player { eprintln!("{} trying to control other player's inventory", player); return Err(bevy_ecs::query::QueryEntityError::NoSuchEntity(src_ent)); }
-                Ok((t.pos, s.inventory.remove_n_from_stack(*src_slot, *count)))
+                Ok((t.pos, s.inventory.remove_n_from_stack(*src_slot, *count), 0.0))
             }),
             _ => { eprintln!("Object does not have an inventory"); return; }
         };
 
         //unwrap the position and stack
-        let (src_pos, stack) = match res_stack {
+        let (src_pos, stack, src_access_dist) = match res_stack {
             Err(_) => { eprintln!("Unable to get source component for s2s transfer"); return; },
-            Ok((_, None)) => { eprintln!("Source stack could not be accessed"); return; },
-            Ok((t, Some(s))) => (t, s)
+            Ok((_, None, _)) => { eprintln!("Source stack could not be accessed"); return; },
+            Ok((t, Some(s), dist)) => (t, s, dist)
         };
 
         //save this for if we need to return the items from the stack back to the original place
@@ -69,7 +67,7 @@ fn space_to_space(ships: &mut Query<(&mut Ship, &PlayerController, &Transform)>,
             crate::shared::ObjectType::Container | crate::shared::ObjectType::Wreck => containers.get_mut(dst_ent).and_then(|(mut i, t)|{
                 // check the distance
                 let dist = t.pos.metric_distance(&src_pos);
-                if dist > INTERACTION_DISTANCE_METERS { return Ok(Some(stack)); } //this will prompt the system to try and put back the stack it took
+                if dist > i.access_dist { return Ok(Some(stack)); } //this will prompt the system to try and put back the stack it took
                 match i.inv.add_stack(&db.db.item_table, stack, Some(*dst_slot)) {
                     None => Ok(None),
                     Some(s) => Ok(Some(s))
@@ -78,7 +76,7 @@ fn space_to_space(ships: &mut Query<(&mut Ship, &PlayerController, &Transform)>,
             crate::shared::ObjectType::PlayerShip => ships.get_mut(dst_ent).and_then(|(mut i, pc, t)|{
                 if pc.player_name != *player { eprintln!("{} trying to control other player's inventory", player); return Ok(Some(stack)); }
                 let dist = t.pos.metric_distance(&src_pos);
-                if dist > INTERACTION_DISTANCE_METERS { return Ok(Some(stack)); } //this will prompt the system to try and put back the stack it took
+                if dist > src_access_dist { return Ok(Some(stack)); } //this will prompt the system to try and put back the stack it took
                 match i.inventory.add_stack(&db.db.item_table, stack, Some(*dst_slot)) {
                     None => Ok(None),
                     Some(s) => Ok(Some(s))
