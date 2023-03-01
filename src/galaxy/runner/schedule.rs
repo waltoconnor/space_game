@@ -23,6 +23,7 @@ pub fn generate_schedule() -> Schedule {
     network_stage.add_system(sense::sys_get_visible); // not sure if it makes sense to do this here
     network_stage.add_system(market::sys_process_market); // want this to process before inventory motion later
     network_stage.add_system(hanger_mgmt::hanger_mgmt); // this can process at the same time as the market, but not at the same time as inventory management
+    network_stage.add_system(inventory_mgmt::sys_inventory_service_inventory_requests); // this actually does a bit of heavy lifting to grab stations from inventory IDs
 
     // entities examining other entities find them and collect the info they want (before it gets mutated)
     let mut find_stage = SystemStage::parallel();
@@ -51,6 +52,7 @@ pub fn generate_schedule() -> Schedule {
     network_out_stage.add_system(network_msg_generator::sys_dispatch_own_ship);
     network_out_stage.add_system(network_msg_generator::sys_dispatch_ev_dock_undock_jump);
     network_out_stage.add_system(network_msg_generator::sys_dispatch_inv_bank_updates);
+    network_out_stage.add_system(network_msg_generator::sys_dispatch_ship_inventory_requests);
 
     // all the bookkeeping for jumps, docks, and undocks is handled here
     let mut update_stage = SystemStage::parallel();

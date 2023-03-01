@@ -27,6 +27,9 @@ pub fn hanger_mgmt(hangers: Query<&Hanger>, ptm: Res<PathToEntityMap>, net: Res<
                         eprintln!("No active location found for connected account");
                     }
                 },
+                NetIncomingMessage::HangerRequestShips(hanger_id) => {
+                    ein.send(EInfo::UpdateInventoryHanger(player.clone(), hanger_id.clone()));
+                }
                 _ => ()
             }
         }

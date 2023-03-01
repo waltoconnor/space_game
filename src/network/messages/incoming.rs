@@ -1,5 +1,5 @@
 use serde::{Serialize, Deserialize};
-use crate::{shared::ObjPath, inventory::{InvSlot, InvId, ItemId}, db::HangerSlot};
+use crate::{shared::ObjPath, inventory::{InvSlot, InvId, ItemId}, db::HangerSlot, galaxy::components::HngId};
 
 // player will be known due to map location
 
@@ -22,6 +22,8 @@ pub enum NetIncomingMessage {
 
     /* Hanger */
     SetActiveShip(HangerSlot), // hanger slot
+    /* TODO: request list of all hangers */
+    HangerRequestShips(HngId), // hanger id
 
     /* Inventory */
     InvSpaceToSpace(ObjPath, InvSlot, u32, ObjPath, InvSlot), //source object, source slot, source count, dst_container, dst_slot
@@ -29,6 +31,10 @@ pub enum NetIncomingMessage {
     InvHangerShipToHangerShip(HangerSlot, InvSlot, u32, HangerSlot, InvSlot), //source hanger slot, source slot, count, dest hanger slot, dst slot
     InvStationToShip(InvId, InvSlot, u32, HangerSlot, InvSlot), //source inv, source slot, count, dst ship, dst slot
     InvStationToStation(InvId, InvSlot, u32, InvId, InvSlot), //source inv, source slot, count, dst inv, dst slot
+    InvRequestInventoryList, //requesting list of all paths/ids with inventories
+    InvRequestInventory(InvId), //requesting dump of specific station inventory
+    InvRequestShip(ObjPath), // requesting ship onboard inventory
+    InvRequestGameObject(ObjPath), // TODO: figure out rules for this
 
     /* Market */
     PlaceBuyOrder(ItemId, InvId, u32, i64), //item, location, count, price PER ITEM

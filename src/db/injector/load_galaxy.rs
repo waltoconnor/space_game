@@ -183,5 +183,9 @@ pub fn load_galaxy_map(gal: &LGalaxy) -> GalaxyMap {
         }
     }
 
+    for irl in gal.region_connections.iter() {
+        links.push(GMLink { start: irl.sys_a.clone(), end: irl.sys_b.clone() });
+    }
+
     GalaxyMap { systems, links }
 }

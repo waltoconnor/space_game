@@ -1,5 +1,5 @@
 
-use std::fmt::Debug;
+use std::{fmt::Debug, collections::HashMap};
 
 use serde::{Serialize, Deserialize};
 use sled::{Tree, Db, IVec};
@@ -398,6 +398,40 @@ impl DB {
             let slot = inv.insert_stack(stack);
             (Some(inv), ())
         });
+    }
+
+    pub fn inventory_player_dump_all_inventories(&self, name: &String) -> HashMap<InvId, Inventory> {
+        let prefix = self.ser(name);
+        let mut r = self.inventory.scan_prefix(prefix);
+        let mut hm = HashMap::new();
+        while let Some(Ok((key_raw, data_raw))) = r.next() {
+            let key: String = self.deser(&key_raw);
+            let inv: Inventory = self.deser(&data_raw);
+            if let Some((_name, id)) = key.split_once(':') {
+                hm.insert(id.to_string(), inv);
+            }
+            else {
+                continue;
+            }
+        };
+        hm
+    }
+
+    pub fn inventory_player_list_inventories(&self, name: &String) -> Vec<InvId> {
+        let prefix = self.ser(name);
+        let r = self.inventory.scan_prefix(prefix);
+        r.keys()
+            .filter_map(|v| 
+                match v { 
+                    Ok(d) => self.deser(&d), 
+                    Err(_) => None
+                }
+            )
+            .filter_map(|text: String| 
+                text.split_once(':')
+                .map(|(_name, inv_id)| inv_id.to_string())
+            )
+            .collect()
     }
 
     /* MARKET */

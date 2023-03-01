@@ -222,3 +222,40 @@ fn inv_to_inv(hanger: &Query<&Hanger>, ptm: &Res<PathToEntityMap>, db: &Res<Data
         };
     }
 }
+
+pub fn sys_inventory_service_inventory_requests(hangers: Query<(&Hanger, &GameObject)>, ships: Query<&PlayerController>, ptm: Res<PathToEntityMap>,net: Res<NetworkHandler>, db: Res<DatabaseResource>, mut ein: EventWriter<EInfo>) {
+    for batch in net.view_incoming().iter(){
+        let player = batch.key();
+        let msgs = batch.value();
+        for msg in msgs.iter() {
+            match msg {
+                NetIncomingMessage::InvRequestInventory(inv_id) => {
+                    ein.send(EInfo::UpdateInventoryId(player.clone(), inv_id.clone()));
+                },
+                NetIncomingMessage::InvRequestInventoryList => {
+                    /* THIS IS HORRIBLY INEFFICIENT */
+                    let list = db.db.inventory_player_list_inventories(player);
+                    let joined_list = list.iter().filter_map(|inv_id| {
+                        for (h, go) in hangers.iter() {
+                            if h.hanger_uid == *inv_id {
+                                return Some((go.path.clone(), inv_id.clone()));
+                            }
+                        }
+                        None
+                    }).collect();
+                    ein.send(EInfo::UpdateInventoryList(player.clone(), joined_list))
+                },
+                NetIncomingMessage::InvRequestShip(obj_path) => {
+                    if let Some(ship_ent) = ptm.get(obj_path) {
+                        if let Ok(pc) = ships.get(ship_ent) {
+                            if pc.player_name == *player {
+                                ein.send(EInfo::UpdateInventoryShip(player.clone(), obj_path.clone()));
+                            }
+                        }
+                    }
+                },
+                _ => ()
+            }
+        }
+    }
+}

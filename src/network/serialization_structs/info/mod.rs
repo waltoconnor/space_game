@@ -14,4 +14,6 @@ pub enum NetOutInfo {
     Bank(i64), //value
     Store(ItemStore), //store
     GalaxyMap(GalaxyMap),
+    InvList(Vec<(ObjPath, InvId)>), // station paths, inv ids
+    InventoryGameObject(Inventory, ObjPath), //inv, path
 }

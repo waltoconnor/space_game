@@ -3,6 +3,8 @@ use crate::{galaxy::{resources::{path_to_entity::PathToEntityMap, network_handle
 
 use super::super::components::*;
 
+/* LOGIC IS NOT CHECKED IN HERE FOR THE MOST PART, INSTEAD IF WE GET AN EVENT, WE ASSUME IT IS LEGIT */
+
 pub fn sys_dispatch_static_data(
     suns: Query<(&Sun, &GameObject, &Celestial)>, 
     planets: Query<(&Planet, &GameObject, &Celestial, &Transform)>, 
@@ -169,8 +171,39 @@ pub fn sys_dispatch_inv_bank_updates(
                 if let Some(store) = db.db.market_load_item_store(item_id.clone()) {
                     net.enqueue_outgoing(player, NetOutgoingMessage::Info(NetOutInfo::Store(store)));
                 }
-            }
+            },
+            EInfo::UpdateInventoryList(player, inv_list) => {
+                net.enqueue_outgoing(player, NetOutgoingMessage::Info(NetOutInfo::InvList(inv_list.clone())));
+            },
             _ => ()
         }
     }
 }
+
+pub fn sys_dispatch_ship_inventory_requests(
+    ships: Query<&Ship>,
+    mut inf: EventReader<EInfo>,
+    net: Res<NetworkHandler>,
+    ptm: Res<PathToEntityMap>,
+){
+    for e in inf.iter() {
+        match e {
+            EInfo::UpdateInventoryShip(player, ship_path) => {
+                if let Some(ship_ent) = ptm.get(ship_path) {
+                    if let Ok(ship) = ships.get(ship_ent) {
+                        net.enqueue_outgoing(player, NetOutgoingMessage::Info(NetOutInfo::InventoryGameObject(ship.inventory.clone(), ship_path.clone())));
+                    }
+                    else {
+                        eprintln!("Ship entity not found")
+                    }
+                }
+                else {
+                    eprintln!("Player ship not found: {}-{:?}", player, ship_path);
+                }
+            },
+            _ => ()
+        }
+    }
+}
+
+/* TODO: Implement game object inventory requests */

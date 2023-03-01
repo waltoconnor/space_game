@@ -76,7 +76,12 @@ pub fn sys_dispatch_login_info(
 
                     net.enqueue_outgoing(player, NetOutgoingMessage::Info(NetOutInfo::GalaxyMap(gmap.gmap.clone())));
                     net.enqueue_outgoing(player, NetOutgoingMessage::Info(NetOutInfo::Location(loc)));
-                    
+                    if let Some(money) = db.db.bank_get_value(player) {
+                        net.enqueue_outgoing(player, NetOutgoingMessage::Info(NetOutInfo::Bank(money)));
+                    }
+                    else {
+                        eprintln!("ERROR: NO BANK ACCOUNT FOR {}", player);
+                    }
                     /* TODO: HANDLE SKILLS AND BANK ACCOUNT */
                 },
                 NetIncomingMessage::Disconnect => {

@@ -12,6 +12,7 @@ pub fn handle_new_player(gal: &Galaxy, name: &String, token: &String, server: &S
             let sh = gal.world.get::<Hanger>(starter_station).expect("Could not get starter hanger component"); 
             db.account_create(&name, &token, starter_station_path);
             db.bank_new_account(&name);
+            db.bank_apply_transaction(&name, config.gameplay_config.starting_money, String::from("Starting money"));
             db.market_add_player_index(&name);
             db.inventory_ensure(&name, sh.hanger_uid.clone());
             let mut ship_inv = Inventory::new(None, Some(10000));
