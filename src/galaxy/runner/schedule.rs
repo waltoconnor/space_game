@@ -43,7 +43,7 @@ pub fn generate_schedule() -> Schedule {
     // things that might die get checked for death here, and scheduled for kill if needed
     let mut death_stage = SystemStage::parallel();
 
-    death_stage.add_system(safe_logout::sys_dispatch_login_info);
+    death_stage.add_system(logon_mgmt::sys_dispatch_login_info);
 
     // sends messages to everyone about what happened
     let mut network_out_stage = SystemStage::parallel();
@@ -58,7 +58,8 @@ pub fn generate_schedule() -> Schedule {
     let mut update_stage = SystemStage::parallel();
     update_stage
         .add_system(path_table_bookeeping::update_path_table)
-        .add_system(star_system_table_bookeeping::update_star_system_table);
+        .add_system(star_system_table_bookeeping::update_star_system_table)
+        .add_system(logon_mgmt::logon_bookeeping_handle_send_initial_info);
 
     // all the bookkeeping for things that died is handled here
     let mut removal_stage = SystemStage::parallel();

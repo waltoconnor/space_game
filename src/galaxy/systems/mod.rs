@@ -6,7 +6,7 @@ pub mod docking_undocking;
 pub mod jump;
 pub mod sense;
 pub mod network_msg_generator;
-pub mod safe_logout;
+pub mod logon_mgmt;
 pub mod inventory_mgmt;
 pub mod market;
 pub mod hanger_mgmt;

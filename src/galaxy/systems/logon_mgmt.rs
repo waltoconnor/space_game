@@ -41,6 +41,7 @@ pub fn sys_dispatch_login_info(
                             Ok(mut s) => {
                                 s.0.login_state = LoginState::LoggedIn; 
                                 eev.send(EEvent::Undock(player.clone(), loc));
+                                ein.send(EInfo::UpdateInventoryShip(player.clone(), s.4.path.clone()));
                                 println!("Reset player's ship"); 
                                 continue; 
                             },
@@ -50,7 +51,12 @@ pub fn sys_dispatch_login_info(
 
                     if loc.t == ObjectType::PlayerShip {
                         match db.db.sis_load_ship(player) {
-                            Some(s) => command.spawn(BPlayerShip::load_from_db(s.ship, player, s.nav, s.transform, s.game_obj)),
+                            Some(s) => {
+                                command.spawn(BPlayerShip::load_from_db(s.ship, player, s.nav, s.transform, s.game_obj));
+                                /* TODO: the player is not in the PTEM by the time the inventory request executes*/
+                                /* MOVE THIS TO THE BOOK KEEPING SECTION SO IT GETS HANDLED NEXT FRAME */
+                                //ein.send(EInfo::UpdateInventoryShip(player.clone(), loc.clone())); 
+                            },
                             None => {
                                 eprintln!("Ship not found in db, TODO: reset player to home");
                                 continue;
@@ -136,4 +142,10 @@ pub fn sys_dispatch_login_info(
             command.entity(ent).despawn();
         }
     });
+}
+
+pub fn logon_bookeeping_handle_send_initial_info(new_ships: Query<(&Ship, &GameObject, &PlayerController), Added<PlayerController>>, mut ein: EventWriter<EInfo>) {
+    for (_s, go, pc) in new_ships.iter() {
+        ein.send(EInfo::UpdateInventoryShip(pc.player_name.clone(), go.path.clone()));
+    }
 }
