@@ -38,7 +38,13 @@ pub fn sys_process_jump_inputs(mut players: Query<(&PlayerController, &mut Trans
                         Some(g) => g
                     };
 
-                    let (gate, g_transform, g_go) = gates.get(gate_ent).expect("Could not get gate entity");
+                    let (gate, g_transform, g_go) = match gates.get(gate_ent) {
+                        Ok(g) => g,
+                        Err(e) => {
+                            eprintln!("Unable to process jump (ship = {:?}, gate = {:?}): {:?}", ship_path, gate_path, e);
+                            continue;
+                        }
+                    };
 
                     let dist = pc_transform.pos.metric_distance(&g_transform.pos);
                     if dist >= gate.jump_range {
@@ -61,7 +67,7 @@ pub fn sys_process_jump_inputs(mut players: Query<(&PlayerController, &mut Trans
                     pc_transform.vel = Vector3::zeros();
                     pc_transform.pos = dst_gate_transform.pos + (Vector3::<f64>::new(rng.gen::<f64>() - 0.5, rng.gen::<f64>() - 0.5, rng.gen::<f64>() - 0.5).normalize() * 1000.0);
                     go.path = ObjPath::new(&dst_go.path.sys, go.path.t.clone(), &go.path.name);
-                    eev.send(EEvent::Jump(player_name.clone(), dst_go.path.sys.clone()));
+                    eev.send(EEvent::Jump(player_name.clone(), go.path.clone()));
                     db.db.account_change_location(player_name, go.path.clone());
                 },
                 _ => ()

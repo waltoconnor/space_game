@@ -7,4 +7,5 @@ use crate::shared::ObjPath;
 pub enum NetOutEvent {
     Dock(ObjPath), //station
     Undock(ObjPath), //ship
+    Jump(ObjPath), //new ship path
 }

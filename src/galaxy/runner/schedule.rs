@@ -49,7 +49,7 @@ pub fn generate_schedule() -> Schedule {
     network_out_stage.add_system(network_msg_generator::sys_dispatch_static_data);
     network_out_stage.add_system(network_msg_generator::sys_dispatch_other_ships);
     network_out_stage.add_system(network_msg_generator::sys_dispatch_own_ship);
-    network_out_stage.add_system(network_msg_generator::sys_dispatch_ev_dock_undock);
+    network_out_stage.add_system(network_msg_generator::sys_dispatch_ev_dock_undock_jump);
     network_out_stage.add_system(network_msg_generator::sys_dispatch_inv_bank_updates);
 
     // all the bookkeeping for jumps, docks, and undocks is handled here

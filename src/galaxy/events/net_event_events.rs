@@ -7,5 +7,5 @@ use crate::shared::ObjPath;
 pub enum EEvent {
     Undock(String, ObjPath), //player, ship
     Dock(String, ObjPath), //player, station
-    Jump(String, String), //player, dst system
+    Jump(String, ObjPath), //player, new_ship_path
 }

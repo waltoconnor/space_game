@@ -18,7 +18,7 @@ pub fn sys_dispatch_static_data(
     events.iter().for_each(|e| {
         let (sys, player) = match e {
             EEvent::Undock(player, ship) => (ship.sys.clone(), player),
-            EEvent::Jump(player, system) => (system.clone(), player),
+            EEvent::Jump(player, ship_path) => (ship_path.sys.clone(), player),
             _ => { return; }
         };
 
@@ -121,7 +121,7 @@ pub fn sys_dispatch_own_ship(
     })
 }
 
-pub fn sys_dispatch_ev_dock_undock(
+pub fn sys_dispatch_ev_dock_undock_jump(
     mut eev: EventReader<EEvent>,
     net: Res<NetworkHandler>
 ){
@@ -129,6 +129,10 @@ pub fn sys_dispatch_ev_dock_undock(
         match e {
             EEvent::Dock(player, station) => net.enqueue_outgoing(player, NetOutgoingMessage::Event(NetOutEvent::Dock(station.clone()))),
             EEvent::Undock(player, ship) => net.enqueue_outgoing(player, NetOutgoingMessage::Event(NetOutEvent::Undock(ship.clone()))),
+            EEvent::Jump(player, ship) => {
+                net.enqueue_outgoing(player, NetOutgoingMessage::Info(NetOutInfo::Location(ship.clone())));
+                net.enqueue_outgoing(player, NetOutgoingMessage::Event(NetOutEvent::Jump(ship.clone())));   
+            },
             _ => ()
         }
     }

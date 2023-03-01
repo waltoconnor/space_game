@@ -189,7 +189,7 @@ fn server_thread(addr: SocketAddrV4, server_receive_pipe: Sender<(String, NetInc
                         };
                         
                         if closed {
-                            println!("Player {} disconnected", &name);
+                            println!("Player {} disconnected due to socket break", &name);
                             if name != String::new() {
                                 local_send_to_player_map.remove(&name);
                                 websocket.close(None);
@@ -200,8 +200,9 @@ fn server_thread(addr: SocketAddrV4, server_receive_pipe: Sender<(String, NetInc
 
                         while let Ok(tpm) = local_receive_pipe.try_recv() { //IF WE HAVE A PACKET FROM THE SERVER TO FORWARD, DO SO
                             //println!("Sending message to {}", tpm.player);
-                            //println!("Msg: {:?}", tpm);
+                            // println!("Msg: {:?}", tpm);
                             let str = serde_json::to_string(&tpm).expect("Could not serialize message");
+                            println!("Sending message: {}B", str.len());
                             websocket.write_message(str.into()).expect("Could not send message"); 
                         }
                         //println!("Exiting (queue empty: {})", local_receive_pipe.try_recv().is_err());
@@ -210,16 +211,22 @@ fn server_thread(addr: SocketAddrV4, server_receive_pipe: Sender<(String, NetInc
                 };
 
                 if msg.is_close() {
-                    println!("Player {} disconnected", &name);
+                    println!("Player {} disconnected with close message", &name);
                     if name != String::new() {
                         local_send_to_player_map.remove(&name);
                         server_rec_pipe.send((name.clone(), NetIncomingMessage::Disconnect)).expect("Could not send disconnect message");
+                        return;
                     }
                 }
                 
                 //IF WE ARE HERE, IT MEANS WE GOT A MESSAGE FROM THE PLAYER AND HAVE IT IN msg
                 //PARSE IT AND FORWARD IT TO THE SERVER
-                let player_msg: NetIncomingMessage = serde_json::from_str::<NetIncomingMessage>(msg.into_text().expect("Could not convert message to text").as_str()).expect("Could not deserialize message from player");
+                let msg_text = msg.into_text().expect("Could not convert message to text");
+                let msg_str = msg_text.as_str();
+                let player_msg: NetIncomingMessage = match serde_json::from_str::<NetIncomingMessage>(msg_str) {
+                    Ok(msg) => msg,
+                    Err(e) => { eprintln!("Failed to deser message from player: {} (message = {})", e, msg_str); continue; }
+                };
                 println!("Player msg: {:?}", player_msg);
                 server_rec_pipe.send((name.clone(), player_msg)).expect("Could not forward player message to server");
             }
