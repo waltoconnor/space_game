@@ -118,6 +118,7 @@ fn handle_undock(hangers: &Query<(&Hanger, &Transform)>, ptm: &Res<PathToEntityM
             let new_ship = BPlayerShip::new(player_name, t, s, &hanger_path.sys, &ship_name);
             db.db.account_change_location(player_name, new_ship.game_obj.path.clone());
             eev.send(EEvent::Undock(player_name.clone(), new_ship.game_obj.path.clone()));
+            ein.send(EInfo::UpdateInventoryShip(player_name.clone(), new_ship.game_obj.path.clone()));
             commands.spawn(new_ship);
         }
     }

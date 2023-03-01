@@ -23,7 +23,7 @@ pub fn sys_manage_inventory_transfers(mut ships: Query<(&mut Ship, &PlayerContro
 }
 
 // Super overly verbose and full of checks here because we want to catch duplication and annihilation bugs really badly
-fn space_to_space(ships: &mut Query<(&mut Ship, &PlayerController, &Transform)>, containers: &mut Query<(&mut Container, &Transform)>, ptm: &Res<PathToEntityMap>, db: &Res<DatabaseResource>, _ein: &mut EventWriter<EInfo>, msg: &NetIncomingMessage, player: &String) {
+fn space_to_space(ships: &mut Query<(&mut Ship, &PlayerController, &Transform)>, containers: &mut Query<(&mut Container, &Transform)>, ptm: &Res<PathToEntityMap>, db: &Res<DatabaseResource>, ein: &mut EventWriter<EInfo>, msg: &NetIncomingMessage, player: &String) {
     if let NetIncomingMessage::InvSpaceToSpace(src_path, src_slot, count, dst_path, dst_slot) = msg {
         let src_ent = match ptm.get(src_path) {
             None => { eprintln!("Source inventory does not exist"); return; },
@@ -66,6 +66,7 @@ fn space_to_space(ships: &mut Query<(&mut Ship, &PlayerController, &Transform)>,
                 // check the distance
                 let dist = t.pos.metric_distance(&src_pos);
                 if dist > i.access_dist { return Ok(Some(stack)); } //this will prompt the system to try and put back the stack it took
+                ein.send(EInfo::UpdateInventoryShip(player.clone(), src_path.clone()));
                 match i.inv.add_stack(&db.db.item_table, stack, Some(*dst_slot)) {
                     None => Ok(None),
                     Some(s) => Ok(Some(s))
@@ -75,6 +76,7 @@ fn space_to_space(ships: &mut Query<(&mut Ship, &PlayerController, &Transform)>,
                 if pc.player_name != *player { eprintln!("{} trying to control other player's inventory", player); return Ok(Some(stack)); }
                 let dist = t.pos.metric_distance(&src_pos);
                 if dist > src_access_dist { return Ok(Some(stack)); } //this will prompt the system to try and put back the stack it took
+                ein.send(EInfo::UpdateInventoryShip(player.clone(), dst_path.clone()));
                 match i.inventory.add_stack(&db.db.item_table, stack, Some(*dst_slot)) {
                     None => Ok(None),
                     Some(s) => Ok(Some(s))
@@ -122,6 +124,7 @@ fn space_to_space(ships: &mut Query<(&mut Ship, &PlayerController, &Transform)>,
                 }
             }
         };
+        
     }
     else {
         eprintln!("Wrong message type sent to space_to_space inventory manager");
