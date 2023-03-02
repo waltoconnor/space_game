@@ -6,6 +6,7 @@ use crate::{galaxy::components::ObjectVisibility, shared::ObjPath};
 pub enum EState {
     // Statics(String, String), // player, system
     OtherShip(String, ObjPath, ObjectVisibility), //player, ship, visibility
+    LostSight(String, ObjPath), //player, object path
     // OwnShip(String, ObjPath), //player, own ship path
 }
 

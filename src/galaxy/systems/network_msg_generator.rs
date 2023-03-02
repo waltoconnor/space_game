@@ -121,6 +121,9 @@ pub fn sys_dispatch_other_ships(
                 else {
                     eprintln!("Sensed ship not found in ptm ({} seeing {:?})", player, ship_path);
                 }
+            },
+            EState::LostSight(player, ship_path) => {
+                net.enqueue_outgoing(player, NetOutgoingMessage::State(NetOutState::LostSight(ship_path.clone())));
             }
         }
     }
@@ -151,14 +154,14 @@ pub fn sys_dispatch_other_ships_movement(
 
         for ent in updates {
             if let Ok((t, go)) = moved.get(ent) {
-                net.enqueue_outgoing(&pc.player_name, NetOutgoingMessage::Mv(go.path.name.clone(), [t.pos.x, t.pos.y, t.pos.z], [t.vel.x as f32, t.vel.y as f32, t.vel.z as f32], [t.rot.w as f32, t.rot.i as f32, t.rot.j as f32, t.rot.j as f32]));
+                net.enqueue_outgoing(&pc.player_name, t.to_mv(go.path.name.clone()));
             }
         }
     });
 }
 
 pub fn sys_dispatch_own_ship(
-    ships: Query<(&Ship, &PlayerController, &GameObject, &Transform, &Navigation), Or<(Changed<Ship>, Changed<Navigation>)>>,
+    ships: Query<(&Ship, &PlayerController, &GameObject, &Transform, &Navigation), Changed<Ship>>,
     net: Res<NetworkHandler>
 ){
     ships.par_for_each(16, |(s, pc, go, t, n)| {
@@ -187,7 +190,7 @@ pub fn sys_dispatch_own_ship_movement(
     net: Res<NetworkHandler>,
 ){
     moved.par_for_each(16, |(t, go, pc)| {
-        net.enqueue_outgoing(&pc.player_name, NetOutgoingMessage::Mv(go.path.name.clone(), [t.pos.x, t.pos.y, t.pos.z], [t.vel.x as f32, t.vel.y as f32, t.vel.z as f32], [t.rot.w as f32, t.rot.i as f32, t.rot.j as f32, t.rot.j as f32]));
+        net.enqueue_outgoing(&pc.player_name, t.to_mv(go.path.name.clone()));
     });
 }
 

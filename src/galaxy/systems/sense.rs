@@ -64,7 +64,12 @@ pub fn sys_get_visible(mut sensors: Query<(Entity, &mut Sensor, &Ship, &PlayerCo
                     sensor.visible_objs.insert(object_path.clone()) && !was_lockable //returns true if the item was previously invisible
                 },
                 ObjectVisibility::NotVisible => {
-                    sensor.lockable_objs.remove(&object_path) || sensor.visible_objs.remove(&object_path)
+                    if sensor.lockable_objs.remove(&object_path) || sensor.visible_objs.remove(&object_path) {
+                        //IF THIS IS TRUE, WE ACTUALLY LOST SIGHT OF THE OBJECT
+                        let mut ew = est_mut.lock().expect("Could not lock mutex");
+                        ew.send(EState::LostSight(pc.player_name.clone(), object_path.clone()));
+                    }
+                    false
                 }
                 ObjectVisibility::Static => false
             };

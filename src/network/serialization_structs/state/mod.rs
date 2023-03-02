@@ -14,12 +14,13 @@ pub use structures::*;
 pub enum NetOutState {
     System(SSystem),
     OtherShip(SPlayerShip_OTHER),
-    OwnShip(SPlayerShip_OWN)
+    OwnShip(SPlayerShip_OWN),
+    LostSight(ObjPath),
 }
 
 
 use bevy_ecs::prelude::*;
-use crate::galaxy::components::*;
+use crate::{galaxy::components::*, shared::ObjPath};
 
 #[derive(Serialize, Deserialize)]
 pub struct SSystem {
