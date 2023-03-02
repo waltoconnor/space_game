@@ -63,6 +63,7 @@ fn update_manual_navigation(q: &mut Query<(&PlayerController, &mut Navigation, &
         nav.banked_rot = nav.banked_rot.normalize() * MAX_DATA_QUEUED_SECONDS;
     }
     nav.banked_thrust = (nav.banked_thrust + t).clamp(0.0, MAX_DATA_QUEUED_SECONDS); //the player can provide negative thrust, it just doesn't do anything for now
+    println!("{:?}", nav);
 
 }
 
@@ -240,6 +241,10 @@ pub fn sys_tick_navigation(mut q: Query<(&mut Navigation, &Ship, &mut Transform)
             Some(ctp) => update_navigation(&mut nav, ship, &mut ship_transform, ctp, vel, dt.dt),
             None => { /*println!("No target pos");*/ }
         };
+
+        if nav.banked_rot.magnitude() > 0.0 || nav.banked_thrust > 0.0 {
+            handle_manual_navigation(&mut nav, ship, &mut ship_transform, dt.dt);
+        }
     });
 }
 
@@ -251,19 +256,20 @@ pub fn sys_tick_navigation(mut q: Query<(&mut Navigation, &Ship, &mut Transform)
 // }
 
 fn update_navigation(nav: &mut Navigation, ship: &Ship, transform: &mut Transform, target_pos: Vector3<f64>, target_vel: Option<Vector3<f64>>, dt: f64) {
-    //println!("{:#?}", nav);
+    println!("UPDATE NAVIGATION TIME: {:#?}", nav);
     match nav.cur_action {
         Action::Warp(t) => handle_warp_to(nav, ship, transform, target_pos, dt, t),
         Action::AlignTo => handle_align_to(nav, ship, transform, target_pos, dt),
         Action::Approach => handle_approach(nav, ship, transform, target_pos, target_vel, dt),
         Action::KeepAtRange(r) => handle_keep_at_range(nav, ship, transform, target_pos, target_vel, dt, r),
-        Action::None => handle_manual_navigation(nav, ship, transform, dt),
+        Action::None => (),
         Action::Orbit(r) => handle_orbit(nav, ship, transform, target_pos, dt, r),
     }
 }
 
 fn handle_manual_navigation(nav: &mut Navigation, ship: &Ship, transform: &mut Transform, dt: f64) {
     /* MIGHT HAVE FP INACCURACY CAUSE THINGS TO JITTER AROUND HERE */
+    const EPSILON: f64 = 0.000001;
 
     // handle rotation
     let rot_vel = ship.stats.ang_vel_rads;
@@ -275,6 +281,9 @@ fn handle_manual_navigation(nav: &mut Navigation, ship: &Ship, transform: &mut T
     let real_rot = total * rot_vel;
     let rot_quat = UnitQuaternion::from_euler_angles(real_rot.z, real_rot.x, real_rot.y);
     transform.rot *= rot_quat;
+    if nav.banked_rot.magnitude() < EPSILON {
+        nav.banked_rot = Vector3::zeros();
+    }
 
     // handle thrust
     let max_accel = ship.stats.thrust_n / ship.stats.mass_kg;
@@ -283,6 +292,10 @@ fn handle_manual_navigation(nav: &mut Navigation, ship: &Ship, transform: &mut T
     let thrust_vector = transform.rot.transform_vector(&Vector3::new(0.0, 0.0, dv));
     nav.banked_thrust -= this_frame_thrust;
     transform.vel += thrust_vector;
+
+    if nav.banked_thrust < EPSILON {
+        nav.banked_thrust = 0.0;
+    }
 
 }
 
