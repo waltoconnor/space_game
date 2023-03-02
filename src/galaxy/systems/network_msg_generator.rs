@@ -1,5 +1,7 @@
+use std::collections::HashMap;
+
 use bevy_ecs::prelude::*;
-use crate::{galaxy::{resources::{path_to_entity::PathToEntityMap, network_handler::NetworkHandler, star_system_table::SystemMapTable, database_resource::DatabaseResource}, events::{EEvent, EInfo}}, network::{serialization_structs::{state::{SSystem, SPlayerShip_OTHER, NetOutState, SPlayerShip_OWN}, event::NetOutEvent, info::{NetOutInfo, hanger::SHanger}}, messages::{outgoing::NetOutgoingMessage}}, inventory::Inventory};
+use crate::{galaxy::{resources::{path_to_entity::PathToEntityMap, network_handler::NetworkHandler, star_system_table::SystemMapTable, database_resource::DatabaseResource}, events::{EEvent, EInfo, EState}}, network::{serialization_structs::{state::{SSystem, SPlayerShip_OTHER, NetOutState, SPlayerShip_OWN}, event::NetOutEvent, info::{NetOutInfo, hanger::SHanger}}, messages::{outgoing::NetOutgoingMessage}}, inventory::Inventory};
 
 use super::super::components::*;
 
@@ -51,55 +53,112 @@ pub fn sys_dispatch_other_ships(
     ships: Query<(&Ship, &PlayerController, &GameObject, &Transform)>,
     net: Res<NetworkHandler>,
     ptm: Res<PathToEntityMap>,
+    mut est: EventReader<EState>,
 ){
-    sensor.par_for_each(16, |(pc, s)|{
+    // sensor.par_for_each(16, |(pc, s)|{
+    //     match pc.login_state {
+    //         LoginState::LoggedOut(_) => { /* println!("Ship for {} logged out", pc.player_name); */ return; },
+    //         _ => ()
+    //     };
+
+    //     let visible = s.visible_objs.iter().filter_map(|obj| ptm.get(obj)); // just silently ignore broken stuff, TODO: DEAL WITH THIS
+    //     for v in visible {
+    //         // println!("Sensor: {} can see {:?}", pc.player_name, ptm.get_path_from_entity(v));
+    //         let (os, opc, ogo, ot) = match ships.get(v) {
+    //             Err(_) => { eprintln!("Ship not found for sensor"); continue; },
+    //             Ok(s) => s
+    //         };
+
+    //         let other_ship = SPlayerShip_OTHER {
+    //             path: ogo.path.clone(),
+    //             ship_class: os.ship_class.clone(),
+    //             ship_name: os.ship_name.clone(),
+    //             transform: ot.clone(),
+    //             player_name: opc.player_name.clone()
+    //         };
+
+    //         net.enqueue_outgoing(&pc.player_name, NetOutgoingMessage::State(NetOutState::OtherShip(other_ship)));
+    //     }
+
+    //     let lockable = s.lockable_objs.iter().filter_map(|obj| ptm.get(obj)); // just silently ignore broken stuff, TODO: DEAL WITH THIS
+    //     for v in lockable {
+    //         // println!("Sensor: {} can see {:?}", pc.player_name, ptm.get_path_from_entity(v));
+    //         let (os, opc, ogo, ot) = match ships.get(v) {
+    //             Err(_) => { eprintln!("Ship not found for sensor"); continue; },
+    //             Ok(s) => s
+    //         };
+
+    //         let other_ship = SPlayerShip_OTHER {
+    //             path: ogo.path.clone(),
+    //             ship_class: os.ship_class.clone(),
+    //             ship_name: os.ship_name.clone(),
+    //             transform: ot.clone(),
+    //             player_name: opc.player_name.clone()
+    //         };
+
+    //         net.enqueue_outgoing(&pc.player_name, NetOutgoingMessage::State(NetOutState::OtherShip(other_ship)));
+    //     }
+    // });
+
+    let mut update_map = HashMap::new();
+
+    for event in est.iter() {
+        match event {
+            EState::OtherShip(player, ship_path, vis) => {
+                if let Some(oship_ent) = ptm.get(&ship_path) {
+                    if let Ok((os, opc, ogo, ot)) = ships.get(oship_ent) {
+                        let other_ship = SPlayerShip_OTHER {
+                            path: ogo.path.clone(),
+                            ship_class: os.ship_class.clone(),
+                            ship_name: os.ship_name.clone(),
+                            transform: ot.clone(),
+                            player_name: opc.player_name.clone(),
+                            vis: vis.clone()
+                        };
+                        update_map.entry(player).or_insert(vec![]).push(other_ship);
+                    }
+                }
+                else {
+                    eprintln!("Sensed ship not found in ptm ({} seeing {:?})", player, ship_path);
+                }
+            }
+        }
+    }
+
+    for (pc, s) in sensor.iter() {
         match pc.login_state {
-            LoginState::LoggedOut(_) => { /* println!("Ship for {} logged out", pc.player_name); */ return; },
+            LoginState::LoggedOut(_) => { return; },
             _ => ()
         };
 
-        let visible = s.visible_objs.iter().filter_map(|obj| ptm.get(obj)); // just silently ignore broken stuff, TODO: DEAL WITH THIS
-        for v in visible {
-            // println!("Sensor: {} can see {:?}", pc.player_name, ptm.get_path_from_entity(v));
-            let (os, opc, ogo, ot) = match ships.get(v) {
-                Err(_) => { eprintln!("Ship not found for sensor"); continue; },
-                Ok(s) => s
-            };
+        update_map.remove(&pc.player_name).map(|ships| {
+            for s in ships {
+                net.enqueue_outgoing(&pc.player_name, NetOutgoingMessage::State(NetOutState::OtherShip(s)));
+            }
+        });
+    }
+}
 
-            let other_ship = SPlayerShip_OTHER {
-                path: ogo.path.clone(),
-                ship_class: os.ship_class.clone(),
-                ship_name: os.ship_name.clone(),
-                transform: ot.clone(),
-                player_name: opc.player_name.clone()
-            };
+pub fn sys_dispatch_other_ships_movement(
+    moved: Query<(&Transform, &GameObject), Changed<Transform>>, 
+    sensor: Query<(&PlayerController, &Sensor)>, 
+    net: Res<NetworkHandler>,
+    ptm: Res<PathToEntityMap>,
+){
+    sensor.par_for_each(32, |(pc, s)| {
+        let mut updates: Vec<Entity> = s.visible_objs.iter().filter_map(|path| ptm.get(path)).collect();
+        updates.extend(s.lockable_objs.iter().filter_map(|path| ptm.get(path)));
 
-            net.enqueue_outgoing(&pc.player_name, NetOutgoingMessage::State(NetOutState::OtherShip(other_ship)));
-        }
-
-        let lockable = s.lockable_objs.iter().filter_map(|obj| ptm.get(obj)); // just silently ignore broken stuff, TODO: DEAL WITH THIS
-        for v in lockable {
-            // println!("Sensor: {} can see {:?}", pc.player_name, ptm.get_path_from_entity(v));
-            let (os, opc, ogo, ot) = match ships.get(v) {
-                Err(_) => { eprintln!("Ship not found for sensor"); continue; },
-                Ok(s) => s
-            };
-
-            let other_ship = SPlayerShip_OTHER {
-                path: ogo.path.clone(),
-                ship_class: os.ship_class.clone(),
-                ship_name: os.ship_name.clone(),
-                transform: ot.clone(),
-                player_name: opc.player_name.clone()
-            };
-
-            net.enqueue_outgoing(&pc.player_name, NetOutgoingMessage::State(NetOutState::OtherShip(other_ship)));
+        for ent in updates {
+            if let Ok((t, go)) = moved.get(ent) {
+                net.enqueue_outgoing(&pc.player_name, NetOutgoingMessage::Mv(go.path.name.clone(), [t.pos.x, t.pos.y, t.pos.z], [t.vel.x as f32, t.vel.y as f32, t.vel.z as f32], [t.rot.w as f32, t.rot.i as f32, t.rot.j as f32, t.rot.j as f32]));
+            }
         }
     });
 }
 
 pub fn sys_dispatch_own_ship(
-    ships: Query<(&Ship, &PlayerController, &GameObject, &Transform, &Navigation)>,
+    ships: Query<(&Ship, &PlayerController, &GameObject, &Transform, &Navigation), Or<(Changed<Ship>, Changed<Navigation>)>>,
     net: Res<NetworkHandler>
 ){
     ships.par_for_each(16, |(s, pc, go, t, n)| {
@@ -121,6 +180,15 @@ pub fn sys_dispatch_own_ship(
 
         net.enqueue_outgoing(&pc.player_name, NetOutgoingMessage::State(NetOutState::OwnShip(ship)));
     })
+}
+
+pub fn sys_dispatch_own_ship_movement(
+    moved: Query<(&Transform, &GameObject, &PlayerController), Changed<Transform>>, 
+    net: Res<NetworkHandler>,
+){
+    moved.par_for_each(16, |(t, go, pc)| {
+        net.enqueue_outgoing(&pc.player_name, NetOutgoingMessage::Mv(go.path.name.clone(), [t.pos.x, t.pos.y, t.pos.z], [t.vel.x as f32, t.vel.y as f32, t.vel.z as f32], [t.rot.w as f32, t.rot.i as f32, t.rot.j as f32, t.rot.j as f32]));
+    });
 }
 
 pub fn sys_dispatch_ev_dock_undock_jump(

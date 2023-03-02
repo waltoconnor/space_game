@@ -53,6 +53,8 @@ pub fn generate_schedule() -> Schedule {
     network_out_stage.add_system(network_msg_generator::sys_dispatch_ev_dock_undock_jump);
     network_out_stage.add_system(network_msg_generator::sys_dispatch_inv_bank_updates);
     network_out_stage.add_system(network_msg_generator::sys_dispatch_ship_inventory_requests);
+    network_out_stage.add_system(network_msg_generator::sys_dispatch_other_ships_movement);
+    network_out_stage.add_system(network_msg_generator::sys_dispatch_own_ship_movement);
 
     // all the bookkeeping for jumps, docks, and undocks is handled here
     let mut update_stage = SystemStage::parallel();

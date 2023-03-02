@@ -1,6 +1,6 @@
 use serde::{Serialize, Deserialize};
 
-use crate::{shared::ObjPath, galaxy::components::{Stats, Transform, Navigation, Action, NavTarget, WarpState}};
+use crate::{shared::ObjPath, galaxy::components::{Stats, Transform, Navigation, Action, NavTarget, WarpState, ObjectVisibility}};
 
 #[derive(Serialize, Deserialize)]
 pub struct SPlayerShip_OTHER {
@@ -9,6 +9,7 @@ pub struct SPlayerShip_OTHER {
     pub ship_name: String,
     pub transform: Transform,
     pub player_name: String,
+    pub vis: ObjectVisibility
 }
 
 #[derive(Serialize, Deserialize)]

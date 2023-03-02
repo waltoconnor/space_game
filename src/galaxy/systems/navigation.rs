@@ -12,11 +12,57 @@ pub fn sys_process_navigation_inputs_local(mut players: Query<(&PlayerController
         for msg in entry.value().iter() {
             match msg {
                 NetIncomingMessage::Approach(ship, dst) => update_navigation_local(&mut players, &ptm, ship, dst, &entry.key(), Action::Approach, &mut ein),
+                NetIncomingMessage::MNav(ship, x, y, z, t) => update_manual_navigation(&mut players, &ptm, ship, &entry.key(), *x, *y, *z, *t),
                 _ => ()
                 /* DO NOT PROCESS WARPS HERE */
             }
         }
     }
+}
+
+fn update_manual_navigation(q: &mut Query<(&PlayerController, &mut Navigation, &Ship)>, ptm: &Res<PathToEntityMap>, ship_path: &ObjPath, player: &String, x: f64, y: f64, z: f64, t: f64) {
+    // get ship entity
+    let ship_ent = match ptm.get(ship_path){
+        Some(s) => s,
+        None => { eprintln!("Player requesting action for nonexistent ship"); return; }
+    };
+
+    //get components
+    let (pc, mut nav, _ship) = match q.get_mut(ship_ent) {
+        Ok(x) => x,
+        Err(_) => {
+            eprintln!("Navigation ship not found in space: {}", player);
+            return;
+        }
+    };
+
+    // validate player
+    if pc.player_name != *player {
+        eprintln!("Player sending command for ship they don't own");
+        return;
+    }
+
+    if let WarpState::Warping(_) = nav.warp_state {
+        // cant use thrust while warping
+        return;
+    }
+
+    //we leave it to the client to only send manual navigation messages when they intend to cancel their current navigation instructions
+    nav.reset();
+    
+    //x, y, and z are literally the integral of their respective input axii w.r.t time (with the y value bounded between -1 and 1)
+    //therefore, a well behaved client should only send a value of at most "interval_between_messages" per message (so if it sends a message every 50ms, the max value on any axis should be 0.05)
+    //we offer some leniency by allowing a client to "queue up" a couple frames of input beyond this limit (so if a packet arrives late, or a bunch arrive in a burst, the input isn't lost, just delayed)
+    //the max duration of data you can queue is expressed below
+    /* TODO: Make this configurable, it is likely that servers with high latency clients will need to increase this */
+    const MAX_DATA_QUEUED_SECONDS: f64 = 0.2;
+
+    //we normalize the rotations so that you don't go faster by rotating in multiple planes at the same time
+    nav.banked_rot += Vector3::new(x, y, z);
+    if nav.banked_rot.magnitude() > MAX_DATA_QUEUED_SECONDS {
+        nav.banked_rot = nav.banked_rot.normalize() * MAX_DATA_QUEUED_SECONDS;
+    }
+    nav.banked_thrust = (nav.banked_thrust + t).clamp(0.0, MAX_DATA_QUEUED_SECONDS); //the player can provide negative thrust, it just doesn't do anything for now
 
 }
 
@@ -56,6 +102,7 @@ fn update_navigation_local(q: &mut Query<(&PlayerController, &mut Navigation, &S
     }
 
     //println!("{:?} ===> {:?}", ship_path, dst);
+    nav.reset_banked();
     nav.cur_action = op;
     nav.warp_state = WarpState::NotWarping;
     nav.target = NavTarget::Obj(dst.clone())
@@ -135,6 +182,7 @@ fn update_navigation_warp(q: &mut Query<(&PlayerController, &mut Navigation, &Sh
         }
     };
 
+    nav.reset_banked();
     nav.cur_action = Action::Warp(dist);
     nav.warp_state = WarpState::Aligning;
     nav.target = wt;
@@ -209,9 +257,33 @@ fn update_navigation(nav: &mut Navigation, ship: &Ship, transform: &mut Transfor
         Action::AlignTo => handle_align_to(nav, ship, transform, target_pos, dt),
         Action::Approach => handle_approach(nav, ship, transform, target_pos, target_vel, dt),
         Action::KeepAtRange(r) => handle_keep_at_range(nav, ship, transform, target_pos, target_vel, dt, r),
-        Action::None => (),
+        Action::None => handle_manual_navigation(nav, ship, transform, dt),
         Action::Orbit(r) => handle_orbit(nav, ship, transform, target_pos, dt, r),
     }
+}
+
+fn handle_manual_navigation(nav: &mut Navigation, ship: &Ship, transform: &mut Transform, dt: f64) {
+    /* MIGHT HAVE FP INACCURACY CAUSE THINGS TO JITTER AROUND HERE */
+
+    // handle rotation
+    let rot_vel = ship.stats.ang_vel_rads;
+    let this_frame_x = nav.banked_rot.x.clamp(-dt, dt);
+    let this_frame_y = nav.banked_rot.y.clamp(-dt, dt);
+    let this_frame_z = nav.banked_rot.z.clamp(-dt, dt);
+    let total = Vector3::<f64>::new(this_frame_x, this_frame_y, this_frame_z);
+    nav.banked_rot -= total;
+    let real_rot = total * rot_vel;
+    let rot_quat = UnitQuaternion::from_euler_angles(real_rot.z, real_rot.x, real_rot.y);
+    transform.rot *= rot_quat;
+
+    // handle thrust
+    let max_accel = ship.stats.thrust_n / ship.stats.mass_kg;
+    let this_frame_thrust = nav.banked_thrust.clamp(0.0, dt);
+    let dv = this_frame_thrust * max_accel;
+    let thrust_vector = transform.rot.transform_vector(&Vector3::new(0.0, 0.0, dv));
+    nav.banked_thrust -= this_frame_thrust;
+    transform.vel += thrust_vector;
+
 }
 
 fn handle_warp_to(nav: &mut Navigation, ship: &Ship, transform: &mut Transform, target_pos: Vector3<f64>, dt: f64, target_dist: f64) {

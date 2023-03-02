@@ -12,6 +12,7 @@ pub enum NetIncomingMessage {
     /* Motion */
     WarpTo(ObjPath, ObjPath, f64), //ship, dst, dist
     Approach(ObjPath, ObjPath), //ship, dst
+    MNav(ObjPath, f64, f64, f64, f64), //net rotation and thrust time x,y,z,t (integrate [-1, 1] (or [0,1] for thrust) axis input over the reporting period)
     
     /* Docking */
     Undock(ObjPath), //station path

@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 
 use bevy_ecs::prelude::*;
+use serde::{Serialize, Deserialize};
 
 use crate::shared::ObjPath;
 
@@ -10,7 +11,7 @@ pub struct Sensor {
     pub visible_objs: HashSet<ObjPath>,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone)]
 pub enum ObjectVisibility {
     Lockable, // you can see and lock this
     Visible, // you can see this but not lock it

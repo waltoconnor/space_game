@@ -1,8 +1,12 @@
-use bevy_ecs::prelude::*;
-use crate::galaxy::{components::*, resources::star_system_table::SystemMapTable};
+use std::sync::Mutex;
 
-pub fn sys_get_visible(mut sensors: Query<(Entity, &mut Sensor, &Ship)>, signatures: Query<&Signature>, game_objects: Query<(&GameObject, &Transform)>, sys_map: Res<SystemMapTable>) {
-    sensors.par_for_each_mut(4, |(ent, mut sensor, ship)| {
+use bevy_ecs::prelude::*;
+use crate::galaxy::{components::*, resources::star_system_table::SystemMapTable, events::{EState, EEvent}};
+
+/* TODO: rework to only operate over signatured objects, we don't need to find the visibility of static objects */
+pub fn sys_get_visible(mut sensors: Query<(Entity, &mut Sensor, &Ship, &PlayerController)>, signatures: Query<&Signature>, game_objects: Query<(&GameObject, &Transform)>, sys_map: Res<SystemMapTable>, mut est: EventWriter<EState>) {
+    let est_mut = Mutex::new(est);
+    sensors.par_for_each_mut(4, |(ent, mut sensor, ship, pc)| {
         let sensor_system = match sys_map.get_system_of_entity(ent){
             Some(ss) => ss,
             None => {
@@ -17,8 +21,8 @@ pub fn sys_get_visible(mut sensors: Query<(Entity, &mut Sensor, &Ship)>, signatu
             None => { eprintln!("System that sensor is in not found, something is really broken"); return; }
         };
 
-        sensor.lockable_objs.clear();
-        sensor.visible_objs.clear();
+        //sensor.lockable_objs.clear();
+        //sensor.visible_objs.clear();
 
         let sensor_pos = match game_objects.get(ent) {
             Ok((_, mt)) => mt,
@@ -50,12 +54,25 @@ pub fn sys_get_visible(mut sensors: Query<(Entity, &mut Sensor, &Ship)>, signatu
 
             //println!("Ship {} is sensing {:?} ({:?})", ship.ship_name, object_path, vis_status);
 
-            match vis_status {
-                ObjectVisibility::Lockable => sensor.lockable_objs.insert(object_path),
-                ObjectVisibility::Visible => sensor.visible_objs.insert(object_path),
-                ObjectVisibility::NotVisible => false,
+            let newly_visible = match vis_status {
+                ObjectVisibility::Lockable => {
+                    let was_visible = sensor.visible_objs.remove(&object_path);
+                    sensor.lockable_objs.insert(object_path.clone()) && !was_visible //returns true if the item was previously invisible
+                },
+                ObjectVisibility::Visible => {
+                    let was_lockable = sensor.lockable_objs.remove(&object_path);
+                    sensor.visible_objs.insert(object_path.clone()) && !was_lockable //returns true if the item was previously invisible
+                },
+                ObjectVisibility::NotVisible => {
+                    sensor.lockable_objs.remove(&object_path) || sensor.visible_objs.remove(&object_path)
+                }
                 ObjectVisibility::Static => false
             };
+
+            if newly_visible {
+                let mut ew = est_mut.lock().expect("Could not lock mutex");
+                ew.send(EState::OtherShip(pc.player_name.clone(), object_path.clone(), vis_status));
+            }
         }
             
     });

@@ -34,7 +34,9 @@ pub struct Navigation {
     pub warp_state: WarpState,
     pub target: NavTarget,
     pub cur_target_pos: Option<Vector3<f64>>,
-    pub cur_target_vel: Option<Vector3<f64>>
+    pub cur_target_vel: Option<Vector3<f64>>,
+    pub banked_thrust: f64,
+    pub banked_rot: Vector3<f64>
 }
 
 impl Navigation {
@@ -44,7 +46,9 @@ impl Navigation {
             warp_state: WarpState::NotWarping, 
             target: NavTarget::None, 
             cur_target_pos: None, 
-            cur_target_vel: None 
+            cur_target_vel: None,
+            banked_thrust: 0.0,
+            banked_rot: Vector3::zeros()
         }
     }
 
@@ -54,5 +58,10 @@ impl Navigation {
         self.target = NavTarget::None;
         self.cur_target_pos = None;
         self.cur_target_vel = None;
+    }
+
+    pub fn reset_banked(&mut self) {
+        self.banked_rot = Vector3::zeros();
+        self.banked_thrust = 0.0;
     }
 }
